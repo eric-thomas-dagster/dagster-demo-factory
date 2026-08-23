@@ -76,17 +76,43 @@ Seed `state/ledger.json` with `{"built": []}`.
 
 ## Step 2 — Create the cloud environment
 
-At `claude.ai/code/routines` → New routine → environment selector → create
-`dagster-demo-factory`.
+There is **no settings page and no direct URL** for this. The only way in is
+the environment selector:
 
-**Environment variables:**
+1. Go to `claude.ai/code`.
+2. In the row **above the message box**, click the **cloud icon** showing the
+   current environment name (probably says "Default").
+3. Hover the environment you created → click the **gear icon** on the right.
+   (Or **Add cloud environment** if you haven't made it yet.)
+4. The dialog has four fields: Name, Network access, Environment variables,
+   Setup script.
 
-| Name | Value |
-|---|---|
-| `DAGSTER_CLOUD_ORGANIZATION` | `ericthomas-dagster` |
-| `DAGSTER_CLOUD_API_TOKEN` | *(your fresh token)* |
-| `DAGSTER_CLOUD_DEPLOYMENT` | `demos` — see the warning below |
-| `GH_TOKEN` | *(optional — only if you want standalone repos per prospect)* |
+You can also reach the same dialog from inside the routine editor — the cloud
+icon sits just below the Instructions box.
+
+**Environment variables** is a single text box in `.env` format, one
+`KEY=value` per line. No quotes needed. Paste this:
+
+```
+DAGSTER_CLOUD_ORGANIZATION=ericthomas-dagster
+DAGSTER_CLOUD_DEPLOYMENT=prod
+DAGSTER_CLOUD_API_TOKEN=user:your-fresh-token-here
+```
+
+Add `GH_TOKEN=ghp_...` **only** if you want the optional standalone-repo-per-
+prospect behavior — see the GH_TOKEN note below, it's not a free win.
+
+Three things about this box:
+
+- **Don't quote values, and avoid `#`.** In an unquoted value a `#` starts a
+  comment and the rest of the line is silently dropped. Dagster+ tokens don't
+  contain `#`, but a password might.
+- **Values are copied once at session start.** Editing them affects the *next*
+  session, not one already running. Edit before 2am, not at 2:05.
+- **There's no secrets store, and the dialog says so.** Anyone with access to
+  the environment can read these. It's your personal environment on your own
+  account, so the practical exposure is you — but it's why the token needs to
+  be one you're willing to rotate casually.
 
 **Network access:** set to **Custom**, check *"Also include default list of
 common package managers"*, and add:
@@ -107,32 +133,55 @@ allowlist entries.
 **Setup script:**
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+curl -LsSf https://astral.sh/uv/install.sh | sh || true
 export PATH="$HOME/.local/bin:$PATH"
-uv tool install dagster-cloud
-uv tool install "dagster-dg-cli"
+uv tool install dagster-cloud || true
+uv tool install dagster-dg-cli || true
+# pex is required by `deploy-python-executable --build-method local`.
+# Its absence cost a full deploy cycle on 2026-08-24.
+uv tool install pex || true
+pip install --break-system-packages pex build || true
+exit 0
 ```
 
 The result is cached, so this doesn't re-run every session.
 
+Three constraints on setup scripts: it must **exit zero** (a non-zero exit means
+the session fails to start — append `|| true` to anything non-critical), finish
+in **under ~5 minutes**, and it **cannot see your environment variables**.
+
+That last one is a real trap. Values in the Environment variables box are
+injected into the *session shell*, not into the setup script — they read as
+empty there, with no error. The script above deliberately needs no secrets. If
+you ever extend it to do something authenticated, that's the thing that will
+bite you.
+
+### The `GH_TOKEN` decision
+
+Leave it unset and GitHub still works: cloud sessions authenticate through a
+GitHub proxy that keeps your real credentials outside the VM, and `gh` works
+without `gh auth login`. But `GH_TOKEN` then reads as the literal placeholder
+string `proxy-injected`, and the proxy only reaches **repositories attached to
+the session**.
+
+So with the proxy, `gh repo create` for a brand-new prospect repo will 403.
+Two options:
+
+- **Skip it** (recommended to start). The monorepo PR into
+  `dagster-demo-factory` is the real deliverable; standalone repos are a nice-
+  to-have. Routine 2 detects the placeholder and skips silently.
+- **Set a real `GH_TOKEN`** (classic PAT with `repo` scope). Then it passes
+  through unchanged and repo creation works — at the cost of a long-lived
+  credential sitting in a field with no secrets store.
+
 ---
 
-### ⚠️ On deploying to `prod`
+### On `prod`
 
-You asked for deployment to `prod`. I'd push back on that one thing.
-
-An unattended agent deploying a fresh, never-human-reviewed code location into
-`prod` nightly means: prod accumulates a code location per prospect, a demo that
-fails to load shows a red banner in the deployment you screen-share from, and
-there's no rollback path at 6am before a 9am call.
-
-Recommendation: create a separate Dagster+ **full deployment named `demos`** and
-point `DAGSTER_CLOUD_DEPLOYMENT` there. Identical experience for the prospect,
-zero blast radius on prod. Location names are `demo-<prospect>` either way, so
-you can find and delete them.
-
-If you still want prod, just set `DAGSTER_CLOUD_DEPLOYMENT=prod` — the routine
-prompt reads the env var and doesn't care. But add the cleanup routine in Step 5.
+`ericthomas-dagster` is a playground org and `prod` is just its default
+deployment, so demos land there. Location names are `demo-<prospect>`, which
+keeps them findable — add the cleanup routine in Step 5 or you'll have 40 of
+them by Q4.
 
 ---
 
@@ -226,12 +275,14 @@ order right; just don't "fix" it later.
 `remove`/`update` but the installed package (0.8.15) also has `init`,
 `sync-deps`, and `analyze-schedules`.
 
-**Docker isn't available in the sandbox.** `dagster-cloud serverless deploy`
-builds a Docker image and will fail. `deploy-python-executable
---build-method local` builds PEX files with no Docker. The catch: PEX-local
-can only build wheels, so a dependency that's sdist-only will fail the build.
-The prompt handles this by falling back to pinning a wheel-available version
-or dropping the dep.
+**Prefer PEX over Docker for deploys.** `dagster-cloud serverless deploy` builds
+a Docker image; `deploy-python-executable --build-method local` builds PEX files
+and is much faster, which matters in a time-boxed unattended run. Docker *is*
+pre-installed in the sandbox, so the Docker path is a genuine fallback rather
+than a dead end — worth reaching for if PEX fails. The PEX catch: `--build-method
+local` can only bundle packages that publish wheels, so a source-only dependency
+fails the build. The prompt handles that by pinning to a wheel-publishing
+version, dropping the dep, or falling back to `serverless deploy`.
 
 **Push permissions.** Claude pushes to `claude/`-prefixed branches freely.
 Pushes to other branches get rejected if the branch is protected, has someone

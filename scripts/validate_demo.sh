@@ -41,7 +41,7 @@ echo "==> [4/5] dg list components"
 dg list components || echo "    WARNING: component listing failed; check the registry entry point"
 
 echo "==> [5/5] full materialize (the real test)"
-dagster asset materialize --select '*' -m "$PKG" \
+dg launch --assets '*' \
   || fail "assets loaded but did not materialize -- do NOT deploy this"
 
 echo
