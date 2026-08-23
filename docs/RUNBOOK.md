@@ -38,12 +38,16 @@ shots once, then go give the demo.
 **Before any real demo, rehearse it yourself:**
 
 ```bash
-git fetch origin
-git checkout claude/demo-<slug>-<date>
-cd demos/<slug>
-uv sync && source .venv/bin/activate
-dg dev
+./scripts/pull_demo.sh <slug> --dev
 ```
+
+That fetches, finds the demo (on `main` if merged, otherwise the newest
+`claude/demo-<slug>-*` branch), runs `uv sync`, and starts `dg dev`. Add `--pr N`
+to pull a specific PR.
+
+Factory merges to `main` itself once the Dagster+ location confirms `LOADED`, so
+most of the time the demo is already on `main` and this is just a sync. If a
+merge was blocked it stays on the branch and the script finds it anyway.
 
 A green build report is not a rehearsed demo. You want to know where the graph
 view sits and what the check text actually reads like before you're sharing a
@@ -128,6 +132,8 @@ prompt does nothing. The routine runs whatever text is saved in the form.
 | How projects get scaffolded | `scripts/build_demo.sh` |
 | How deploys work | `scripts/deploy_demo.sh` |
 | How resets work | `scripts/reset_demo.sh` |
+| How you pull demos locally | `scripts/pull_demo.sh` |
+| The mandatory Dagster feature floor | `CLAUDE.md` → "Dagster feature floor" |
 | What's been built | `state/ledger.json` |
 | Dagster house style, API guidance | `.claude/skills/dagster-expert/` |
 | Python style | `.claude/skills/dignified-python/` |
