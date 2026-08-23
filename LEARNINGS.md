@@ -55,6 +55,14 @@ it checks every item below in about 20 seconds.
 
 ## Commands and flags
 
+- **Use `dg`, never the legacy `dagster` CLI.** `dg dev` not `dagster dev`;
+  `dg launch --assets '*'` not `dagster asset materialize --select '*'`. Note
+  the flag differs too — `dg launch` takes `--assets`, the old CLI took
+  `--select`. Verified against dagster-dg-cli 1.13.19. (2026-08-24)
+- `dg launch` options: `--assets`, `--job`, `--partition`,
+  `--partition-range <start>...<end>`, `--config` / `--config-json`. Use
+  `--partition` for the single-partition recovery step in demos. (2026-08-24)
+
 - `dagster-component init` does **not** scaffold a project. It writes AI-tool
   config and injects the `dagster_dg_cli.registry_modules` entry point +
   editable install into a project that already exists. Run `create-dagster
