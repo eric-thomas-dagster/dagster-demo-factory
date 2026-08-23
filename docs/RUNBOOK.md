@@ -178,8 +178,14 @@ environment's network allowlist. Add the host, save, re-run.
 about 20 seconds. Gitignored build artifacts silently missing from the wheel is
 the most common and the hardest to spot.
 
-**Factory says nothing is queued.** No ledger entry has `status: "brief-ready"`.
-Either Recon hasn't run, or the entry is already `deployed` — reset it.
+**Factory says nothing is queued.** No ledger entry has `status: "brief-ready"`
+**on `main`**. Usually one of: Recon hasn't run; the entry is already
+`deployed` (reset it); or a `claude/brief-*` branch never got merged, leaving
+`main`'s ledger empty. Check `gh pr list` and `git log main --oneline -- state/`.
+
+State files live on `main` by design — briefs and the ledger are committed
+straight there, and only demo *code* goes through a PR. A brief on an unmerged
+branch is invisible to Factory.
 
 **Generic Dagster code, no house style.** The skills aren't loading. Confirm
 `.claude/skills/dagster-expert/` and `.claude/skills/dignified-python/` are
