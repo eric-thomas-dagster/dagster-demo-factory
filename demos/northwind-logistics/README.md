@@ -147,3 +147,22 @@ Open http://localhost:3000. Materialize a partition from the asset graph, or
 run `dagster asset materialize --select '*' -m northwind_logistics -p <date>`
 from the CLI (dates `2026-08-17` through the most recent available daily
 partition).
+
+## Redeploying
+
+`dbt_project/target/` (the compiled manifest) and
+`defs/.local_defs_state/` (the Fivetran demo component's cached discovery
+state) are both gitignored but force-included into the wheel in
+`pyproject.toml` -- they have to exist on disk *before* building the deploy
+artifact, or the deployed code location fails to load with a
+"manifest.json does not exist" error. Before redeploying:
+
+```bash
+dg utils refresh-defs-state
+```
+
+then run the usual `dagster-cloud serverless deploy-python-executable`
+command (see the repo root `CLAUDE.md` for the full invocation), pointing at
+`--module-name northwind_logistics.definitions` -- bare `--package-name
+northwind_logistics` finds nothing, since the actual `Definitions` live in
+that module, not the bare top-level package.
