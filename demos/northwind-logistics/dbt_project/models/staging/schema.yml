@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: carrier_rate_validated
+    description: >
+      Validated freight rate quotes per carrier x lane x day. Feeds every
+      downstream cost and margin calculation.
+    columns:
+      - name: rate_amount_usd
+        description: Quoted rate in USD before fuel surcharge.
+        tests: [not_null]
+      - name: carrier
+        tests: [not_null]
+
+  - name: shipment_events_clean
+    description: >
+      Deduplicated shipment scan events, ready for lane and customer rollups.
+    columns:
+      - name: shipment_id
+        description: Unique identifier for one shipment scan event.
+        tests: [not_null, unique]

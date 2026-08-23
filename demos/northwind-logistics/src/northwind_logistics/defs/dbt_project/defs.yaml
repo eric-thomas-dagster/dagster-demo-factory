@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=
+
+type: dagster_dbt.DbtProjectComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project: "{{ context.project_root }}/dbt_project"
+  cli_args:
+    - build
+    - "--vars":
+        min_date: "{{ partition_time_window.start.strftime('%Y-%m-%d') }}"
+        max_date: "{{ partition_time_window.end.strftime('%Y-%m-%d') }}"
+  include_metadata:
+    - row_count
+
+post_processing:
+  assets:
+    - target: "*"
+      attributes:
+        partitions_def: "{{ northwind_daily_partitions }}"

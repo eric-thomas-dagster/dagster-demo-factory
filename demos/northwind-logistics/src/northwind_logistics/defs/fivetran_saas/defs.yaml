@@ -1,0 +1,9 @@
+type: northwind_logistics.components.fivetran_demo.DemoFivetranAccountComponent
+
+attributes:
+  demo_mode: true
+  demo_seed: 20260824
+  workspace:
+    account_id: "{{ env('FIVETRAN_ACCOUNT_ID', 'demo-account') }}"
+    api_key: "{{ env('FIVETRAN_API_KEY', 'unused-in-demo-mode') }}"
+    api_secret: "{{ env('FIVETRAN_API_SECRET', 'unused-in-demo-mode') }}"
