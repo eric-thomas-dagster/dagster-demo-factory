@@ -24,11 +24,15 @@ first signal of a broken pipeline is a customer emailing about a missing invoice
 Carrier rate data lands late ~15% of the time and corrupts margin-by-lane reporting
 until month-end close catches it — right as a new CFO is demanding trustworthy
 margin-by-lane-and-customer numbers and a SOC2 renewal is coming up on lineage the
-team punted on last cycle. This demo has to prove that asset-level lineage plus a
-check that actually fails loud (not a green box hiding a red dbt run) catches the
-late-carrier-data problem before it reaches the margin numbers — and that this is
-addable incrementally alongside their existing Airflow estate, not a 340-DAG
-rewrite Marcus has to sign up for on day one.
+team punted on last cycle.
+
+This demo has to prove three things. First, that asset-level lineage plus a check
+that actually fails loud (not a green box hiding a red dbt run) catches the
+late-carrier-data problem before it reaches the margin numbers. Second, that
+**recovery is one partition with a computed blast radius**, not the manual backfill
+work that ate Marcus's July. Third, that all of this is addable incrementally
+alongside their existing Airflow estate, not a 340-DAG rewrite Marcus has to sign
+up for on day one.
 
 ## Meeting
 
@@ -117,10 +121,13 @@ nervous about this, and it's ~2 months away from the demo date.
   Marcus. Unknown whether Jane is a new attendee (EA, additional stakeholder) or a
   scheduling proxy. No conflict between AE notes and public data otherwise — there
   simply is no public data to conflict with.
-- **Unknowns the AE didn't get to:** CI/CD and dbt deployment process; whether
-  Snowflake is a long-term commitment (Marcus made an unexplored comment about
-  "what we're moving to"); budget number (only "platform line item" mentioned);
-  full sign-off chain (assume CFO, unconfirmed).
+- **Snowflake may not be a long-term commitment.** Marcus made an unexplored
+  comment about "what we're moving to." **Do not hard-assert Snowflake as their
+  forever warehouse in the room.** If challenged, pivot: the asset graph, checks,
+  and lineage are warehouse-agnostic — that's a feature, not a dodge.
+- **Other unknowns the AE didn't get to:** CI/CD and dbt deployment process;
+  budget number (only "platform line item" mentioned); full sign-off chain
+  (assume CFO, unconfirmed).
 
 ---
 
@@ -128,97 +135,167 @@ nervous about this, and it's ~2 months away from the demo date.
 
 ## Asset graph
 
-Group into four layers, ~16 assets total, named in Northwind's vocabulary:
+Group into four layers, ~16 assets total, named in Northwind's vocabulary.
 
 **Ingestion**
-- `carrier_rate_raw` (partitioned by carrier: `fedex`, `ups`, `regional_ltl_a`,
-  `regional_ltl_b`; hourly during business hours / daily overnight cadence)
-- `shipment_events_raw` (daily-partitioned, ~4M rows/day synthetic volume, scaled
-  down deterministically for demo runtime)
-- `salesforce_accounts`, `zendesk_tickets`, `netsuite_gl_entries` (via
-  dagster-fivetran, demo-moded)
+- `carrier_rate_raw` — **multi-dimensional partitions: daily time dimension ×
+  static carrier dimension** (`fedex`, `ups`, `regional_ltl_a`,
+  `regional_ltl_b`). Both dimensions are required: the carrier dimension makes
+  "one carrier is late" expressible, and the time dimension makes single-partition
+  recovery surgical. If `MultiPartitionsDefinition` proves too costly to get right
+  in the build window, fall back to daily time partitions with carrier as a
+  column — but say so in the notification, because it weakens the recovery demo.
+- `shipment_events_raw` — daily-partitioned, ~4M rows/day synthetic volume, scaled
+  down deterministically for demo runtime
+- `salesforce_accounts`, `zendesk_tickets`, `netsuite_gl_entries` — via
+  dagster-fivetran, demo-moded
 
 **Validation / staging**
-- `carrier_rate_validated` (dbt model; asset check for on-time arrival + rate
-  discrepancy — this is where the planted failure surfaces)
-- `shipment_events_clean` (dbt model)
+- `carrier_rate_validated` — dbt model; carries the blocking arrival check. This
+  is where the planted failure surfaces.
+- `shipment_events_clean` — dbt model
 
 **Transformation (dbt Core → dagster-dbt, replacing the BashOperator wrapping)**
-- `shipments_by_lane`, `invoice_line_items`, `carrier_cost_allocation` (subset of
-  the ~600 real dbt models — pick ~6–8 that feed the money-shot asset, don't try
-  to port the whole project)
+- `shipments_by_lane`, `invoice_line_items`, `carrier_cost_allocation` — a subset
+  of the ~600 real dbt models. Pick ~6–8 that feed the money-shot asset; do not
+  attempt to port the whole project.
 
 **Reporting**
-- `invoice_billing_nightly` (partitioned daily, SLA check: must be materializable
-  before 6am ET)
-- `member_eligibility_daily` — **not applicable here**; replace with
-  `margin_by_lane_customer` (daily-partitioned) — the money-shot asset the CFO
-  wants and Priya can't currently trust
+- `invoice_billing_nightly` — daily-partitioned, SLA check: must be materializable
+  before 6am ET
+- `margin_by_lane_customer` — daily-partitioned. The money-shot asset: what the
+  CFO wants and what Priya can't currently trust.
+
+## Automation
+
+- `AutomationCondition.eager()` on `margin_by_lane_customer` and
+  `carrier_cost_allocation`, so they recompute on their own when upstream changes.
+  **This is load-bearing for the recovery sequence** — without it, step 5 of Money
+  Shot 2 requires manual clicking and the whole point collapses.
+- A schedule on `invoice_billing_nightly` reflecting the 6am ET finance deadline.
 
 ## Native integrations to use
 
-- `dagster-dbt` for the ~6–8 dbt models (this directly replaces the BashOperator
-  anti-pattern that's the core pain point — make that swap visible)
-- `dagster-snowflake` for warehouse I/O (demo-moded to DuckDB per demo_mode_pattern)
+- `dagster-dbt` for the ~6–8 dbt models. This directly replaces the BashOperator
+  anti-pattern that is the core pain point — **make that swap visible on screen.**
+- `dagster-snowflake` for warehouse I/O, demo-moded to DuckDB. Use the
+  **resource-swap variant** at the bottom of `templates/demo_mode_pattern.py`, not
+  a `build_defs` override — the component stays completely unmodified, which is
+  the strongest version of the pattern and the one that survives "does this work
+  against our Snowflake?"
 - `dagster-fivetran` for the three SaaS sources
-- Consider `dagster-airlift` as a talking point (not necessarily built) for
-  incrementally observing/migrating existing Airflow DAGs — this directly answers
-  Marcus's "what about our 340 DAGs" objection without requiring a rewrite
+- `dagster-airlift` as a **talking point, not a build item** — it answers Marcus's
+  "what about our 340 DAGs" objection by observing/migrating incrementally rather
+  than rewriting. Have the answer ready; do not spend build time on it.
 
 ## Community components to search for
 
-- "REST API source" or "HTTP polling" for the carrier rate feeds (FedEx/UPS/LTL) —
-  no native Dagster integration covers arbitrary carrier rate APIs
-- "Airflow" / "Airflow migration" (for dagster-airlift, confirm current component
-  coverage before committing to it in the demo)
+- "REST API source" / "HTTP polling" / "rate limit" for the carrier rate feeds
+  (FedEx/UPS/LTL) — no native Dagster integration covers arbitrary carrier rate APIs
+- "Airflow" / "Airflow migration" — only to confirm current `dagster-airlift`
+  coverage for the talking point. Do not build on it.
 
 ## Asset checks
 
-1. **Carrier rate freshness/completeness** on `carrier_rate_validated` — fails when
-   a carrier partition hasn't landed within its expected window. Maps to: "freight
+1. **`carrier_rate_arrival` on `carrier_rate_validated` — BLOCKING severity.**
+   Fails when a carrier partition hasn't landed within its expected window.
+   It must be **blocking** so `margin_by_lane_customer` refuses to compute on bad
+   input rather than computing a wrong number. A warning-only check reproduces
+   their current situation with nicer UI and proves nothing. Maps to: "freight
    rate data lands late ~15% of the time."
 2. **dbt run success surfaced as a real failure**, not a green Airflow box — a
-   check on the dbt-model assets that fails loudly (not silently) when the
-   underlying dbt test/model fails. Maps to: "Airflow UI shows green because the
+   check on the dbt-model assets that fails loudly when the underlying dbt
+   test/model fails. Maps to: "the Airflow UI shows green because the
    BashOperator exited 0 even when dbt failed."
-3. **Invoice billing completeness/SLA check** on `invoice_billing_nightly` —
-   verifies row counts/completeness before the 6am ET finance deadline. Maps to:
-   "we find out something broke when a customer emails about a missing invoice."
+3. **`invoice_batch_completeness` on `invoice_billing_nightly`** — verifies row
+   counts/completeness against the 6am ET finance deadline. Maps to: "we find out
+   something broke when a customer emails about a missing invoice."
 
 ## Demo mode
 
 - **What must be mocked:** FedEx/UPS/regional LTL carrier rate APIs, Fivetran
   connectors (Salesforce/Zendesk/NetSuite), Snowflake (swap to DuckDB per
   `templates/demo_mode_pattern.py`).
-- **What can be real:** DuckDB warehouse, dbt Core execution against DuckDB,
-  deterministic synthetic shipment/invoice/carrier-rate generators (seeded).
-- **Planted anomaly:** One regional LTL carrier's rate partition for a specific
-  demo-day date arrives late/missing → `carrier_rate_validated` check fails for
-  that partition → `margin_by_lane_customer` for the affected lane is visibly
-  blocked/flagged rather than silently publishing wrong numbers. This is
-  literally the scenario Priya described.
-- **Data realism notes:** Keep carrier mix at 4 carriers (FedEx, UPS, 2 regional
-  LTL) matching AE notes. Skew shipment volume up ~3x on a couple of demo
-  partitions to gesture at the Oct–Dec peak-season concern without needing a
-  full seasonal model.
+- **What can be real:** DuckDB warehouse, **dbt Core executing for real against
+  DuckDB**, deterministic seeded synthetic generators. Real dbt execution is
+  strongly preferred over mocked — dbt is the centerpiece of the thesis, and
+  simulated dbt lineage undercuts the whole argument.
+- **Planted anomaly:** pin it concretely. `regional_ltl_b` for the `2026-08-21`
+  daily partition arrives missing. Reference that exact partition key in the
+  run-of-show. `carrier_rate_validated` fails its blocking check for that
+  partition; `margin_by_lane_customer` for `2026-08-21` is visibly blocked rather
+  than silently publishing wrong numbers. This is literally the scenario Priya
+  described.
+- **Data realism notes:** Keep the carrier mix at 4 (FedEx, UPS, 2 regional LTL)
+  matching AE notes. Skew shipment volume ~3x on a couple of partitions to gesture
+  at the Oct–Dec peak-season concern without building a seasonal model. Lane and
+  customer cardinalities plausible for a mid-market 3PL.
 
-## Money shot
+## Money shot 1: the failure is caught — aimed at Priya
 
-Materialize `margin_by_lane_customer` for the affected date partition and show
-the run stop cold on a red, human-readable asset check ("Regional LTL carrier B
-rate data is 6 hours late for lane X — margin numbers for this partition are
-blocked, not silently wrong") instead of a green Airflow DAG. Then show the
-backfill: once `carrier_rate_raw` lands, re-materialize and watch the check go
-green and the margin number update — this is "how we'd know something broke,"
-delivered as asset lineage instead of a customer complaint.
+1. Asset graph. The `2026-08-21` / `regional_ltl_b` partition is red; downstream
+   `margin_by_lane_customer` for that date is blocked, not green. Say the line:
+   *their Airflow shows green right here.*
+2. Click the check. It reads as a business fact, not a stack trace — something
+   like *"Regional LTL carrier B rate data has not arrived for 2026-08-21; margin
+   for this partition is blocked, not silently wrong."*
+3. Trace lineage from the failed partition through to `margin_by_lane_customer`.
+   That trace is the SOC2 evidence Priya deferred on last cycle.
+
+## Money shot 2: targeted recovery — aimed at Marcus
+
+Catching the failure answers Priya. This answers Marcus, who lost most of July to
+manual backfills. **Do not cut this section for scope** — without it the demo only
+addresses half the room.
+
+4. Rematerialize **that single partition only** — one carrier, one day. Not the
+   asset, not the month, not the DAG.
+5. `carrier_cost_allocation` and `margin_by_lane_customer` recompute automatically
+   for the affected partition alone, via the automation condition. Nobody clicks
+   them.
+6. Graph goes green. Under a minute, start to finish.
+
+**Contrast line for Marcus:** in Airflow this is clearing a DAG run, guessing the
+downstream blast radius, and re-running by hand — which is where his July went.
+Here the partition is the unit of recovery and the blast radius is computed, not
+remembered.
+
+## Required demo-mode capability — do not skip
+
+The anomaly is seeded deterministically so repeat runs are stable. A naive
+rematerialize therefore regenerates **the same missing data**, and step 5 above
+fails in front of the prospect. The demo component must support healing a
+partition:
+
+- Add `demo_healed_partitions: list[str] = []` alongside `demo_anomaly_partition`,
+  **or** have the generator consult a small local state file (e.g.
+  `demo_data/.healed`) that a materialization writes.
+- **Heal wins.** A partition in the healed set generates clean data even when it
+  matches `demo_anomaly_partition`.
+- **The state file is strongly preferred**, because recovery then happens entirely
+  inside the Dagster UI with no YAML edit and no terminal. Both hands need to be
+  on the story, not on a text editor.
+- **Must be resettable** so the demo can run more than once — a `make reset-demo`
+  target or a reset job in the project. Document it in the README.
+- Healing logic lives **only** in the demo subclass. The `demo_mode: false` path is
+  untouched.
+
+**Validation gate:** the build is not done until this loop has been executed end to
+end — materialize all, confirm the blocking check fails on `2026-08-21` /
+`regional_ltl_b`, heal, rematerialize that partition alone, confirm downstream
+recomputes automatically and the graph goes green. If that loop doesn't work, say
+so in the notification rather than reporting success.
 
 ## Explicitly out of scope
 
 - Full migration of all 340 Airflow DAGs or all 600 dbt models — build ~6–8 dbt
   models and ~16 total assets, not a 1:1 port.
-- Looker — BI layer stays theirs, not touched in the demo.
-- Any real SOC2 control mapping — the demo shows lineage/audit evidence
-  *exists*, it doesn't attempt an actual compliance mapping exercise.
+- `dagster-airlift` implementation. It's a talking point for Marcus; do not build
+  on it.
+- Looker — the BI layer stays theirs, not touched in the demo.
+- Real SOC2 control mapping — the demo shows lineage/audit evidence *exists*, it
+  doesn't attempt a compliance mapping exercise.
 - Real carrier API integrations or real Fivetran connectors — everything upstream
   of the warehouse is demo-moded per the non-negotiables.
 - CI/CD story — unknown from AE notes, don't invent one.
+- Peak-season autoscaling — gesture at volume, don't model seasonality.
