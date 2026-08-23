@@ -17,6 +17,49 @@ every line of Python. Both live in `.claude/skills/` and are committed here
 specifically because cloud routine sessions can only load skills from the
 cloned repo.
 
+## Read LEARNINGS.md before building
+
+`LEARNINGS.md` at the repo root accumulates verified facts from previous runs —
+correct command forms, component schemas, registry gaps, known dead ends. Read
+it after this file and before writing anything. Runs have no memory of each
+other; that file is the only continuity.
+
+Every run updates it (step 10 of the Demo Factory prompt), including failed
+runs. Record only what you verified by running it or reading source — a wrong
+entry is worse than none, because the next run will trust it.
+
+## Use `dg`, never `dagster`
+
+Every command in these projects goes through the `dg` CLI. The legacy `dagster`
+CLI is not to be used, even when it appears to work or when training data
+suggests it.
+
+| Use | Not |
+|---|---|
+| `dg dev` | `dagster dev` |
+| `dg launch --assets '*'` | `dagster asset materialize --select '*'` |
+| `dg launch --assets '*' --partition <key>` | `dagster asset materialize --partition` |
+| `dg check defs` / `dg check yaml` | `dagster definitions validate` |
+| `dg list defs` / `dg list components` | — |
+| `dg utils refresh-defs-state` | — |
+
+`dg launch` also takes `--partition-range <start>...<end>`, `--job`, and
+`--config`. Note `dg launch` uses `--assets`; the legacy CLI used `--select`.
+Getting this wrong wastes turns on flag errors.
+
+## Component escalation ladder
+
+Do not skip a rung:
+
+1. Native Dagster integration, in `defs.yaml` component form
+2. Community registry component, as-is
+3. Community registry component, subclassed
+4. Custom component written from scratch — **last resort**
+
+Rung 4 is the most expensive and the likeliest to eat the build window. Run at
+least three distinct registry searches before writing one, and record the gap
+in `LEARNINGS.md`.
+
 ## Layout
 
 | Path | Purpose |
@@ -52,7 +95,7 @@ drift between runs.
 catches. An all-green asset graph doesn't demonstrate data quality tooling.
 
 **Validate before publishing.** `dg check defs`, `dg list defs`, `dg check
-yaml`, and an actual `dagster asset materialize --select '*'` must all pass.
+yaml`, and an actual `dg launch --assets '*'` must all pass.
 A project that loads but crashes on materialize must not be deployed.
 
 **Their vocabulary, not ours.** Assets named `member_eligibility_daily`, not
