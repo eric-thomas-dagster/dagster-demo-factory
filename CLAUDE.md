@@ -64,11 +64,13 @@ in `LEARNINGS.md`.
 
 | Path | Purpose |
 |---|---|
+| `docs/RUNBOOK.md` | **How to operate this — read this first if you're a human.** |
 | `briefs/` | One markdown brief per prospect. `_TEMPLATE.md` is the required shape. |
 | `demos/<slug>/` | Generated Dagster projects, one directory per prospect. |
 | `templates/demo_mode_pattern.py` | **Read before writing any demo component.** |
-| `scripts/` | Build and deploy helpers. |
+| `scripts/` | Build, validate, preflight, deploy, and reset helpers. |
 | `state/ledger.json` | What's been built. Prevents rebuilds. Always update it. |
+| `docs/00-SETUP.md`, `docs/01-*`, `docs/02-*` | Reference copies of setup notes and the routine prompts. **Nothing reads these** — the live prompts are in the routine web UI. |
 
 ## Non-negotiables
 
