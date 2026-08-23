@@ -55,6 +55,11 @@ it checks every item below in about 20 seconds.
 
 ## Commands and flags
 
+- **Briefs and `state/ledger.json` must live on `main`.** Factory reads both
+  from the default branch; anything on an unmerged `claude/` branch is invisible
+  and the run becomes a silent no-op. Recon commits state directly to `main`;
+  only demo *code* goes through a PR. (2026-08-24)
+
 - **Use `dg`, never the legacy `dagster` CLI.** `dg dev` not `dagster dev`;
   `dg launch --assets '*'` not `dagster asset materialize --select '*'`. Note
   the flag differs too — `dg launch` takes `--assets`, the old CLI took
