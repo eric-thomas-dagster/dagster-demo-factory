@@ -5,7 +5,7 @@ type: dagster_dbt.DbtProjectComponent
 template_vars_module: .template_vars
 
 attributes:
-  project: "{{ context.project_root }}/dbt_project"
+  project: "{{ dbt_project_dir }}"
   cli_args:
     - build
     - "--vars":

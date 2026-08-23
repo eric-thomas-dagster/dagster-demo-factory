@@ -4,14 +4,15 @@ from pathlib import Path
 from dagster import definitions, load_from_defs_folder
 
 # dagster-dbt runs `dbt` from a cached copy of dbt_project/ under
-# defs/.local_defs_state/, so a path relative to dbt_project/profiles.yml
-# does not reliably resolve to this repo's demo_data/ directory. Set an
-# absolute default here (before any component loads) so the Dagster-side
-# warehouse resource and the dbt profile both land on the same file
-# regardless of dbt's working directory. A deployment can still override
-# this by setting NORTHWIND_DUCKDB_PATH itself.
+# defs/.local_defs_state/, and a deployed PEX has no "project root" at all
+# (only this package's installed files exist) -- so a path relative to
+# dbt_project/profiles.yml, or to a repo checkout, doesn't reliably resolve.
+# Anchor on this file's own package directory instead: it resolves correctly
+# both in local dev (src/northwind_logistics/) and once deployed
+# (site-packages/northwind_logistics/). A deployment can still override this
+# by setting NORTHWIND_DUCKDB_PATH itself.
 os.environ.setdefault(
-    "NORTHWIND_DUCKDB_PATH", str(Path(__file__).resolve().parents[2] / "demo_data" / "warehouse.duckdb")
+    "NORTHWIND_DUCKDB_PATH", str(Path(__file__).resolve().parent / "demo_data" / "warehouse.duckdb")
 )
 
 

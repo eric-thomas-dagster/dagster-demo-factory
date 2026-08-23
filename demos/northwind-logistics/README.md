@@ -73,7 +73,7 @@ instead, because finance's close deadline is a clock, not a data dependency.
    depends on `warehouse` (the two ingestion components) picks this up with
    no code or YAML change.
 2. For dbt: `export DBT_TARGET=prod` plus the same `SNOWFLAKE_*` env vars
-   (see `dbt_project/profiles.yml`).
+   (see `src/northwind_logistics/dbt_project/profiles.yml`).
 
 **To flip Fivetran to a real account:** set real `FIVETRAN_ACCOUNT_ID` /
 `FIVETRAN_API_KEY` / `FIVETRAN_API_SECRET` env vars and `demo_mode: false`
