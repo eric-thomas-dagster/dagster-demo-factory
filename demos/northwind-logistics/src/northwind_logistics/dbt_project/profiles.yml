@@ -1,0 +1,26 @@
+# Picked up automatically because dagster-dbt runs `dbt` with this directory
+# as the working directory. Two targets, one flip to go live:
+#
+#   dbt run --target prod   (or export DBT_TARGET=prod)
+#
+# plus real SNOWFLAKE_* env vars. `demo` needs nothing -- it's the default.
+northwind_logistics:
+  target: "{{ env_var('DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # Always set to an absolute path by northwind_logistics/definitions.py
+      # before any component loads -- see that file for why a relative path
+      # here doesn't reliably resolve.
+      path: "{{ env_var('NORTHWIND_DUCKDB_PATH') }}"
+      threads: 4
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT', '') }}"
+      user: "{{ env_var('SNOWFLAKE_USER', '') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD', '') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE', '') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE', 'NORTHWIND') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE', '') }}"
+      schema: "analytics"
+      threads: 4

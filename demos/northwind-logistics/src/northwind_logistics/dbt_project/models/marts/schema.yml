@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: shipments_by_lane
+    description: Daily shipment volume and weight per carrier x lane.
+
+  - name: invoice_line_items
+    description: Per-shipment invoice lines, rated against carrier_rate_validated.
+
+  - name: carrier_cost_allocation
+    description: >
+      Daily average rate, fuel surcharge, and transit time per carrier.
+      Recomputes automatically (AutomationCondition.eager()) whenever
+      carrier_rate_validated changes.
+
+  - name: carrier_performance_summary
+    description: Per-carrier scorecard of volume against transit time and rate.
+
+  - name: customer_shipment_summary
+    description: Shipment and invoice activity per customer, joined to Salesforce.
+
+  - name: invoice_billing_nightly
+    description: >
+      Nightly invoice batch totals. Must be materializable before the 6am ET
+      finance close -- see the schedule in defs/schedules.py.
+
+  - name: margin_by_lane_customer
+    description: >
+      Estimated margin per customer x lane x carrier x day -- the money-shot
+      asset. Recomputes automatically (AutomationCondition.eager()) whenever
+      carrier_cost_allocation or invoice_line_items changes.

@@ -1,0 +1,7 @@
+type: northwind_logistics.components.shipment_events_feed.ShipmentEventsFeedComponent
+
+attributes:
+  demo_mode: true
+  demo_seed: 20260824
+  demo_row_count: 2500
+  start_date: "2026-08-17"
