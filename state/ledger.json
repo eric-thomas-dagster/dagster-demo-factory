@@ -1,1 +1,12 @@
-{"built": []}
+{
+  "built": [
+    {
+      "company": "Northwind Logistics",
+      "slug": "northwind-logistics",
+      "status": "brief-ready",
+      "demo_date": "2026-08-24",
+      "brief_path": "briefs/2026-08-24-northwind-logistics.md",
+      "timestamp": "2026-08-23T20:12:55Z"
+    }
+  ]
+}
