@@ -47,6 +47,37 @@ suggests it.
 `--config`. Note `dg launch` uses `--assets`; the legacy CLI used `--select`.
 Getting this wrong wastes turns on flag errors.
 
+## Dagster feature floor — every demo, unless the brief forbids it
+
+These are what make a demo look like Dagster rather than a DAG runner with nicer
+colours. Include all of them unless a specific brief rules one out. If you have
+to cut for time, cut *asset count*, not feature coverage — eight assets showing
+all of this beats twenty showing none of it.
+
+- **Partitions.** Time-based matching the prospect's real cadence. Reach for
+  `MultiPartitionsDefinition` where a second dimension (region, carrier,
+  tenant, source) is genuinely part of their domain. Partitions are the
+  precondition for the targeted-recovery story, so this one is close to
+  mandatory.
+- **Asset checks.** At least three, each mapped to a pain named in the brief.
+  At least one **blocking** severity, so downstream refuses to compute on bad
+  input rather than computing something wrong. Warning-only checks reproduce
+  the prospect's current situation with better styling and prove nothing.
+- **A real dbt project.** Actual dbt Core executing against DuckDB via
+  `dagster-dbt` — real models, real `schema.yml` tests, real generated
+  lineage. Do not mock dbt. Most prospects run dbt, its lineage is the most
+  legible thing in the UI, and simulated lineage collapses under a follow-up
+  question.
+- **Freshness policies.** On the assets a prospect would page someone about.
+  This is the direct answer to "how would we know something broke."
+- **Automation conditions.** `AutomationCondition.eager()` on the assets that
+  should recompute themselves, plus at least one schedule where a real deadline
+  exists. Declarative automation is a headline differentiator against Airflow's
+  imperative scheduling — show it, don't describe it.
+- **Asset metadata.** Row counts, dollar values, compliance tags — whatever the
+  prospect's personas would actually look at.
+- **Asset groups and kinds**, so the graph reads cleanly on a shared screen.
+
 ## Component escalation ladder
 
 Do not skip a rung:
