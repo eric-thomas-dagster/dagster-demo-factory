@@ -93,6 +93,13 @@ matching their real world. Target 12–25 assets. -->
 - **What must be mocked:** <!-- systems we have no credentials for -->
 - **What can be real:** <!-- DuckDB, local files, public APIs -->
 - **Planted anomaly:** <!-- which partition breaks, which check catches it -->
+- **Recovery:** <!-- Assets are idempotent: recovery is just rematerializing
+     the partition, because the SOURCE changed. Model late data as source
+     arrival timing inside the mock. NEVER a heal asset, heal job, or reset
+     object — a demo-control node in the lineage graph tells the prospect
+     they're looking at scaffolding. -->
+- **Demo reset:** <!-- how to re-run this demo a second time. A script or make
+     target outside Dagster, operating on the mock source state. -->
 - **Data realism notes:** <!-- cardinalities, date ranges, expected skew -->
 
 ## Money shot
