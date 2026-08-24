@@ -60,6 +60,23 @@ Run `./scripts/preflight_deploy.sh <slug>` before the first deploy.
 - `deploy-python-executable --build-method local` (PEX); Docker fallback
   (`serverless deploy` minus `--build-method`) if PEX fails on a
   source-only dependency. (2026-08-23)
+- `deploy-python-executable --package-name <pkg>` fails to load ("No
+  Definitions... found") for a `create-dagster`-scaffolded project — the
+  `Definitions` object lives in `<pkg>.definitions`, not the top-level
+  package. Use `--module-name <pkg>.definitions` instead. (2026-08-24)
+- `dagster-cloud deployment delete-location` takes the location as a
+  **positional arg**, not `--location-name` (that flag doesn't exist and
+  errors). `deployment list-locations` prints names/images only, no status —
+  for actual load status use `dg api code-location list --json` (has a real
+  `status` field: `LOADED`/`FAILED`/etc.), matching what deployed locations'
+  `code_source.module_name` should look like (`<pkg>.definitions`).
+  (2026-08-24)
+- A long-running `dagster-cloud serverless deploy-python-executable` call
+  gets killed by a 120s shell-tool timeout while it's polling internally for
+  agent sync (exit 143) even though the deploy itself keeps proceeding
+  server-side — run it as an explicit background task, don't rely on the
+  tool's auto-backgrounding for a command that prints periodic progress
+  lines. (2026-08-24)
 
 ## Component schemas
 
