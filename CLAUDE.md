@@ -47,6 +47,37 @@ suggests it.
 `--config`. Note `dg launch` uses `--assets`; the legacy CLI used `--select`.
 Getting this wrong wastes turns on flag errors.
 
+## Assets are idempotent — the source changes, not the asset
+
+Recovery is never an action inside Dagster. There is no "heal" step, no reset
+asset, no repair job. Rematerializing a partition re-reads the source and picks
+up whatever is there now. That is how Dagster actually works, and the demo has
+to behave the same way or it teaches the prospect something false.
+
+**This means mocks simulate a source *system*, including arrival timing.** A
+late-arriving feed is modelled as: the carrier's API has no rows for that
+partition at 2pm, and has them at 4pm. The asset is unchanged and idempotent;
+its input changed. Rematerialize and it succeeds — for the same reason it would
+in production.
+
+What follows from this:
+
+- **No demo-control assets.** A disconnected `healed_partitions` or
+  `demo_control` node with no lineage is the clearest possible tell that a
+  prospect is looking at scaffolding, and the asset graph is the first thing
+  they see.
+- **No heal or reset jobs.** Op jobs are for genuine side-effectful work a
+  prospect would recognise — shipping logs to an aggregator, firing a
+  notification. They are not a place to hide demo state management.
+- **Mock source state lives outside Dagster**, in `demo_data/`, representing the
+  upstream system's own state. Dagster reads it; Dagster never writes it as part
+  of the demo narrative.
+- **Resetting the demo is an operation on the mock source**, done from a script
+  or `make` target outside Dagster entirely — never a Dagster object.
+
+If a node in the asset graph isn't something the prospect would recognise as
+part of their own data flow, it doesn't belong there.
+
 ## Dagster feature floor — every demo, unless the brief forbids it
 
 These are what make a demo look like Dagster rather than a DAG runner with nicer
