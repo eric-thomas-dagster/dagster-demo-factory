@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: carrier_rate_raw
+        meta:
+          dagster:
+            asset_key: ["raw", "carrier_rate_raw"]
+      - name: shipment_events_raw
+        meta:
+          dagster:
+            asset_key: ["raw", "shipment_events_raw"]
+      - name: salesforce_accounts
+        meta:
+          dagster:
+            asset_key: ["raw", "salesforce_accounts"]
+      - name: zendesk_tickets
+        meta:
+          dagster:
+            asset_key: ["raw", "zendesk_tickets"]
+      - name: netsuite_gl_entries
+        meta:
+          dagster:
+            asset_key: ["raw", "netsuite_gl_entries"]

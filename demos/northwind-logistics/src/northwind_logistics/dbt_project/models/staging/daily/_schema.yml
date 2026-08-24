@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: stg_carrier_rates
+    description: >
+      Daily carrier rate quotes, one row per (carrier, lane, day). Grain is
+      intentionally loose here -- a missing carrier for a day is a *row
+      count* problem, caught by the `carrier_rate_arrival` asset check, not
+      a null-value problem a dbt test can see.
+    columns:
+      - name: carrier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["fedex", "ups", "regional_ltl_a", "regional_ltl_b"]
+      - name: rate_per_mile
+        data_tests: [not_null]
+      - name: fuel_surcharge_pct
+        data_tests: [not_null]
+
+  - name: stg_shipment_events
+    description: "Daily shipment events from the TMS."
+    columns:
+      - name: shipment_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests: [not_null]

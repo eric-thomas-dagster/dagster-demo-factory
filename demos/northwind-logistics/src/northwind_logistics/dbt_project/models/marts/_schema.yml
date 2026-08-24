@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: shipments_by_lane
+    description: "Daily shipment counts and volume, aggregated by carrier and lane."
+    columns:
+      - name: shipment_count
+        data_tests: [not_null]
+
+  - name: invoice_line_items
+    description: "One row per shipment, with allocated NetSuite revenue."
+    columns:
+      - name: shipment_id
+        data_tests: [unique, not_null]
+
+  - name: carrier_cost_allocation
+    description: >
+      Daily freight cost by carrier and lane. Absent for any (day, carrier,
+      lane) whose rate data didn't arrive -- see `carrier_rate_arrival`.
+
+  - name: invoice_billing_nightly
+    description: "Nightly invoice batch summary. Must complete before the 6am ET finance deadline."
+    columns:
+      - name: total_invoiced
+        data_tests: [not_null]
+
+  - name: margin_by_lane_customer
+    description: >
+      The money-shot asset: margin by lane and customer. A (day, carrier,
+      lane) combination with no arrived rate data is absent here, not
+      silently mispriced.
+    columns:
+      - name: margin
+        data_tests: [not_null]
