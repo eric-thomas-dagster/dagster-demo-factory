@@ -38,15 +38,14 @@ echo "==> Re-validating before deploy"
 echo "==> Deploying $LOCATION to $DAGSTER_CLOUD_ORGANIZATION/$DAGSTER_CLOUD_DEPLOYMENT"
 if ! dagster-cloud serverless deploy-python-executable "$PROJECT_DIR" \
       --location-name "$LOCATION" \
-      --package-name "$PKG" \
+      --module-name "$PKG.definitions" \
       --python-version 3.12 \
       --build-method local \
       --organization "$DAGSTER_CLOUD_ORGANIZATION" \
       --deployment "$DAGSTER_CLOUD_DEPLOYMENT" \
       --api-token "$DAGSTER_CLOUD_API_TOKEN"; then
   echo "ERROR: deploy failed. Cleaning up any partial location." >&2
-  dagster-cloud deployment delete-location \
-    --location-name "$LOCATION" \
+  dagster-cloud deployment delete-location "$LOCATION" \
     --organization "$DAGSTER_CLOUD_ORGANIZATION" \
     --deployment "$DAGSTER_CLOUD_DEPLOYMENT" \
     --api-token "$DAGSTER_CLOUD_API_TOKEN" 2>/dev/null || true
@@ -57,20 +56,27 @@ fi
 # or we email "ready!" about a red banner.
 echo "==> Waiting for code location to report loaded (up to 5 min)"
 for i in $(seq 1 30); do
-  STATUS="$(dagster-cloud deployment ls-locations \
-              --organization "$DAGSTER_CLOUD_ORGANIZATION" \
-              --deployment "$DAGSTER_CLOUD_DEPLOYMENT" \
-              --api-token "$DAGSTER_CLOUD_API_TOKEN" 2>/dev/null \
-            | grep -i "$LOCATION" || true)"
-  if echo "$STATUS" | grep -qiE "loaded|success|up"; then
+  # `dagster-cloud deployment list-locations` prints names/images only, no
+  # status -- use `dg api code-location list --json` instead, which returns
+  # a real `status` field (LOADED / FAILED / etc.) per location. (2026-08-24)
+  STATUS_JSON="$(dg api code-location list --json 2>/dev/null \
+    | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+items = data.get('items', data) if isinstance(data, dict) else data
+for loc in items:
+    if loc.get('location_name') == '$LOCATION':
+        print(loc.get('status', 'UNKNOWN'))
+        break
+" || true)"
+  if [[ "$STATUS_JSON" == "LOADED" ]]; then
     echo "    location is live"
     echo
     echo "==> URL: https://${DAGSTER_CLOUD_ORGANIZATION}.dagster.cloud/${DAGSTER_CLOUD_DEPLOYMENT}/locations/${LOCATION}"
     exit 0
   fi
-  if echo "$STATUS" | grep -qiE "fail|error"; then
-    echo "ERROR: location failed to load:" >&2
-    echo "$STATUS" >&2
+  if [[ "$STATUS_JSON" == "FAILED" ]]; then
+    echo "ERROR: location failed to load." >&2
     exit 1
   fi
   sleep 10

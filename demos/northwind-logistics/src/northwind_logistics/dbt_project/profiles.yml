@@ -1,0 +1,20 @@
+northwind_logistics:
+  target: "{{ env_var('NORTHWIND_DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # No relative-path fallback -- if this env var is ever unset, dbt
+      # should fail loudly rather than quietly write to a throwaway file
+      # that silently diverges from what the ingestion assets wrote to.
+      path: "{{ env_var('NORTHWIND_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    live:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: "marts"
+      threads: 4

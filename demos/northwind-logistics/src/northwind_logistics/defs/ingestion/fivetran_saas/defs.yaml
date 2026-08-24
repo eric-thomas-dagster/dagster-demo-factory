@@ -1,0 +1,15 @@
+type: northwind_logistics.components.DemoFivetranAccountComponent
+
+attributes:
+  demo_mode: true
+  demo_seed: 20260824
+  workspace:
+    account_id: "{{ env('FIVETRAN_ACCOUNT_ID', 'demo-account') }}"
+    api_key: "{{ env('FIVETRAN_API_KEY', '') }}"
+    api_secret: "{{ env('FIVETRAN_API_SECRET', '') }}"
+  translation:
+    group_name: ingestion
+    kinds: [fivetran]
+  defs_state:
+    management_type: LOCAL_FILESYSTEM
+    refresh_if_dev: true

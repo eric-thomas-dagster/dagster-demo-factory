@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: stg_salesforce_accounts
+    description: "One row per customer account, from Salesforce via Fivetran."
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: segment
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["enterprise", "mid_market", "smb"]
+
+  - name: stg_zendesk_tickets
+    description: "Support tickets, from Zendesk via Fivetran."
+    columns:
+      - name: ticket_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_salesforce_accounts')
+                field: customer_id
+
+  - name: stg_netsuite_gl_entries
+    description: "Freight revenue GL entries, from NetSuite via Fivetran."
+    columns:
+      - name: gl_entry_id
+        data_tests: [unique, not_null]
+      - name: amount
+        data_tests: [not_null]

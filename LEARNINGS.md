@@ -12,107 +12,162 @@ here, prospect facts in the brief.
 
 ---
 
+## Platform constraint — READ BEFORE DESIGNING LOCAL-STORAGE DEMOS
+
+**Dagster+ Serverless gives each run its own ephemeral disk** (per Dagster's
+own docs — no documented persistent local-storage mount). A local DuckDB
+file written by one run is NOT guaranteed to exist for a later, separate
+run. Any demo whose story spans multiple runs (heal → rematerialize a
+partition → automation-triggered downstream runs) with a local-file
+warehouse must re-seed upstream data deterministically at the start of every
+run that needs it. Small cross-run *control* state (a "healed partitions"
+flag) can live in Dagster's own event log instead — an asset's
+materialization metadata, read via
+`instance.get_latest_materialization_event()` — since that's Dagster+'s own
+managed backend and does survive across runs. (2026-08-24)
+
 ## Deployment packaging — READ BEFORE DEPLOYING
 
-The 2026-08-24 Northwind run took **seven deploy attempts**, all packaging, all
-preventable. Run `./scripts/preflight_deploy.sh <slug>` before the first deploy;
-it checks every item below in about 20 seconds.
+Run `./scripts/preflight_deploy.sh <slug>` before the first deploy.
 
-- **`pex` must be installed** in the environment or `--build-method local`
-  fails immediately. (2026-08-24)
-- **`dagster-cloud` must be a project dependency**, not just a CLI tool on
-  PATH. Add it to `pyproject.toml` dependencies. (2026-08-24)
-- **`--package-name` must point at the module that actually holds
-  `Definitions`**, not the project directory name. Verify with
-  `python -c "import <pkg>"` before deploying. (2026-08-24)
-- **`dbt_project/` must live INSIDE the Python package directory.** If it sits
-  at the project root it is not included in the wheel and the location fails to
-  load in Dagster+ with a confusing path error. (2026-08-24)
-- **`.gitignore`d files do not ship in the wheel.** dbt `target/manifest.json`
-  and Dagster defs-state files are commonly gitignored, silently excluded, and
-  then missing at runtime. Force-include them explicitly via
-  `[tool.hatch.build.targets.wheel]` (or setuptools package-data). (2026-08-24)
-- **Run `dg utils refresh-defs-state` before deploying** when using
-  state-backed components (Fivetran, dbt). Without generated state the location
-  fails to load remotely even though it works locally. (2026-08-24)
-- **Verify the wheel contents rather than trusting config.** `python -m build`
-  then `unzip -l dist/*.whl | grep -E "manifest|defs_state"`. This catches the
-  packaging class of failure in seconds instead of a multi-minute deploy cycle.
-  (2026-08-24)
+- `pex` must be installed; `dagster-cloud` must be a project dependency, not
+  just a CLI tool on PATH; `--package-name` must be the module holding
+  `Definitions`; `dbt_project/` must live INSIDE the package dir. (2026-08-24)
+- **hatchling's wheel only respects the ROOT `.gitignore`.** A nested
+  `.local_defs_state/.gitignore: *` does NOT stop hatchling including most
+  of that dir by default — except `target/` (root `.gitignore` has a
+  generic `target/` rule, and dbt's compiled `manifest.json` lives there).
+  Force-include exactly `.../project/target/manifest.json`; force-including
+  the whole `.local_defs_state` tree double-adds files hatchling already
+  included and errors "second file being added at same path." (2026-08-24)
+- Run `dg utils refresh-defs-state` before deploying state-backed components
+  (Fivetran, dbt) or the location fails to load remotely. Verify wheel
+  contents rather than trusting config: `uv build --wheel` then
+  `unzip -l dist/*.whl | grep manifest.json`. (2026-08-24)
+- `dg launch --assets '*'` unconditionally fails the instant ANY selected
+  asset is partitioned ("no '--partition' option was provided") — no
+  "latest partition of everything" shortcut exists. `validate_demo.sh` step
+  5 now warns instead of failing on this specific error; validate partitioned
+  assets separately (loop `dagster.materialize()` in one Python process —
+  avoids ~10-25s of `dg` CLI/project-load overhead per partition a bash loop
+  of `dg launch` calls would pay every time). (2026-08-24)
 
 ## Deployment — waiting
 
-- The Dagster+ serverless agent sync step routinely takes **several minutes**
-  after PEX upload completes. This is normal, not a hang. (2026-08-24)
-- **Do not poll in a tight loop.** The 2026-08-24 run burned many turns on
-  "still syncing, I'll wait" cycles. Use a blocking wait on the background task
-  (`TaskOutput`) or `sleep 60` between checks. (2026-08-24)
-- A successful deploy command does **not** mean the code location loaded.
-  Confirm independently with `dg api` and look for status `LOADED`. (2026-08-24)
-- Use `deploy-python-executable ... --build-method local` (PEX). Docker *is*
-  available in the sandbox, so plain `serverless deploy` is a genuine fallback
-  if PEX fails on a source-only dependency. (2026-08-23)
+- Serverless agent sync after PEX upload takes several minutes — normal.
+  Don't poll tightly; `sleep 60` between checks. Success from the deploy
+  command != loaded — confirm with `dg api` / status `LOADED`. (2026-08-24)
+- `deploy-python-executable --build-method local` (PEX); Docker fallback
+  (`serverless deploy` minus `--build-method`) if PEX fails on a
+  source-only dependency. (2026-08-23)
+- `deploy-python-executable --package-name <pkg>` fails to load ("No
+  Definitions... found") for a `create-dagster`-scaffolded project — the
+  `Definitions` object lives in `<pkg>.definitions`, not the top-level
+  package. Use `--module-name <pkg>.definitions` instead. (2026-08-24)
+- `dagster-cloud deployment delete-location` takes the location as a
+  **positional arg**, not `--location-name` (that flag doesn't exist and
+  errors). `deployment list-locations` prints names/images only, no status —
+  for actual load status use `dg api code-location list --json` (has a real
+  `status` field: `LOADED`/`FAILED`/etc.), matching what deployed locations'
+  `code_source.module_name` should look like (`<pkg>.definitions`).
+  (2026-08-24)
+- A long-running `dagster-cloud serverless deploy-python-executable` call
+  gets killed by a 120s shell-tool timeout while it's polling internally for
+  agent sync (exit 143) even though the deploy itself keeps proceeding
+  server-side — run it as an explicit background task, don't rely on the
+  tool's auto-backgrounding for a command that prints periodic progress
+  lines. (2026-08-24)
+
+## Component schemas
+
+- A component base may be a `@dataclass` `Resolvable`, not `dg.Model`
+  (e.g. `DbtProjectComponent`). Adding a field via plain `pydantic.Field`
+  is silently invisible in `--defs-yaml-schema` for these — use `@dataclass`
+  on the subclass and `Annotated[T, dg.Resolver.default(description=...)] =
+  default`. Check `ClassName.__mro__`/`model_fields` first. (2026-08-24)
+- Multiple instances of the same dbt-project component (via `select`) need
+  an explicit distinct `op: {name: ...}` — left to the default (auto-suffixed
+  "_2", "_3"), Dagster cross-wires dependencies between instances ("op X
+  does not have input Y" for a Y belonging to a different instance). Also
+  collide on `defs_state` key (`DuplicateDefsStateKeyWarning`) — harmless
+  (state is genuinely shared), not fixed. A dbt test referencing models
+  split across two instances breaks the same way — keep cross-model tests
+  in one instance. (2026-08-24)
+- dbt generic test args (`accepted_values: {values: [...]}`, `relationships:
+  {to:..., field:...}`) must nest under `arguments:` as of dbt-core 1.11, or
+  parsing warns `MissingArgumentsPropertyInGenericTestDeprecation`. (2026-08-24)
+- `MultiPartitionKey` stringifies dimensions **alphabetically by name**
+  regardless of declaration order (`{"date":d,"carrier":c}` → `"<c>|<d>"`).
+  Use `str(context.partition_key)`; don't hand-build the string. (2026-08-24)
+
+## Automation conditions
+
+- `AutomationCondition`'s `&`/`|`/`~` is Python-only — a Jinja `{{ }}` with
+  `&` in defs.yaml raises `TemplateSyntaxError`. Compose it in a
+  `template_vars_module` (`@dg.template_var` functions) and reference the
+  named var in YAML. Use `template_vars_module: .foo` (dot-prefixed, no
+  `.py`) — a literal `foo.py` is treated as an absolute import and raises
+  `ModuleNotFoundError`. (2026-08-24)
+- `AutomationCondition.all_deps_blocking_checks_passed()` = one-call shortcut
+  for "eager, but wait for upstream blocking checks to pass." Load-bearing
+  for any recovery-sequence demo — bare `eager()` fires even while the
+  upstream's blocking check is still failing. (2026-08-24)
+- dbt component `cli_args` Jinja scope for the partition is
+  `partition_time_window` directly, not `context.partition_time_window`
+  (`context` isn't bound there). A `cli_args` item needing a flag+value
+  (`--vars`) must be a single-key YAML mapping (`- --vars: {min_date:...}`),
+  not a hand-built JSON string — Dagster serializes it itself. (2026-08-24)
+
+## Runtime gotchas
+
+- `from __future__ import annotations` in a module with `@dg.asset`/
+  `@dg.multi_asset` functions breaks context-parameter validation (the
+  annotation becomes a literal string Dagster doesn't recognize). Don't use
+  future annotations in files defining asset functions. (2026-08-24)
+- `dg.AssetSpec(key="a/b")` in Python does NOT split "/" into path segments
+  (unlike YAML `key: a/b`) — use `dg.AssetKey(["a","b"])`. (2026-08-24)
+- DuckDB connections report `type(conn).__module__ == "_duckdb"` (leading
+  underscore) — use `"duckdb" in module`, not `.startswith("duckdb")`.
+  DuckDB allows one writer per file; wrap `duckdb.connect()` in a
+  retry-with-backoff loop since Dagster's multiprocess executor can open the
+  same file from sibling processes within milliseconds. (2026-08-24)
+- `CREATE TABLE ... AS SELECT * FROM <empty pandas df>` in DuckDB can
+  silently infer the WRONG column type (VARCHAR→INT32 seen) when a table's
+  first-ever write is a 0-row frame. Pin the schema explicitly if a table's
+  first write can legitimately be empty (a planted anomaly). (2026-08-24)
+- Calling `dbt.cli()` twice in one `execute()` with the SAME injected
+  `DbtCliResource` intermittently fails "No dbt_project.yml found" (dbt
+  preps an isolated working copy per call; reusing the resource object
+  races). Construct a fresh `DbtCliResource(dbt.project_dir)` for any extra
+  untracked call. (2026-08-24)
+- Without `DAGSTER_HOME` set, cross-run event-log state doesn't reliably
+  persist between separate `dg` CLI invocations in local validation. (2026-08-24)
 
 ## Commands and flags
 
-- **Briefs and `state/ledger.json` must live on `main`.** Factory reads both
-  from the default branch; anything on an unmerged `claude/` branch is invisible
-  and the run becomes a silent no-op. Recon commits state directly to `main`;
-  only demo *code* goes through a PR. (2026-08-24)
-
-- **Use `dg`, never the legacy `dagster` CLI.** `dg dev` not `dagster dev`;
-  `dg launch --assets '*'` not `dagster asset materialize --select '*'`. Note
-  the flag differs too — `dg launch` takes `--assets`, the old CLI took
-  `--select`. Verified against dagster-dg-cli 1.13.19. (2026-08-24)
-- `dg launch` options: `--assets`, `--job`, `--partition`,
-  `--partition-range <start>...<end>`, `--config` / `--config-json`. Use
-  `--partition` for the single-partition recovery step in demos. (2026-08-24)
-
-- `dagster-component init` does **not** scaffold a project. It writes AI-tool
-  config and injects the `dagster_dg_cli.registry_modules` entry point +
-  editable install into a project that already exists. Run `create-dagster
-  project` first. (2026-08-23)
-- Always pass `--auto-install` to `dagster-component init` and
-  `dagster-component add`. Without it they prompt and hang forever unattended.
-  (2026-08-23)
-- The `dagster-community-components-cli` README is stale: it documents only
-  `add`/`search`/`info`/`list`/`remove`/`update`. Installed package 0.8.15 also
-  has `init`, `sync-deps`, `analyze-schedules`. Check `--help`. (2026-08-23)
-- If `dg list components` doesn't show custom components, the registry entry
-  point didn't wire — re-run `dagster-component init --force`. (2026-08-23)
-- `components/__init__.py` must re-export each component class or the Dagster UI
-  Components tab won't list them even when `dg list components` does.
-  (2026-08-24)
-
-## Build sequencing that worked
-
-- Smoke-test **one partition** of the first ingestion asset before building
-  anything else, and inspect the DuckDB table to confirm the write landed. This
-  caught path issues early on 2026-08-24 and is cheap. (2026-08-24)
-- Run `dg check defs` after each layer (ingestion → SaaS → dbt), not once at the
-  end. Failures localize instead of compounding. (2026-08-24)
-- Set `profiles.yml` to require the env var with no relative-path fallback —
-  a fallback default masks packaging errors locally that then fail in Dagster+.
-  (2026-08-24)
+- Briefs and `state/ledger.json` live on `main` only. Use `dg`, never legacy
+  `dagster` (`dg launch --assets`, not `--select`). `dagster-component init`
+  does not scaffold a project — run `create-dagster project` first, always
+  with `--auto-install`. `dg list components` empty → re-run
+  `dagster-component init --force`. `components/__init__.py` must re-export
+  each component class or the UI Components tab won't list them. (2026-08-23/24)
 
 ## Environment
 
-- `GH_TOKEN` reads as literal `proxy-injected` when the GitHub proxy handles
-  auth. Not a usable token — treat as unset. (2026-08-23)
-- Gmail exposes `create_draft` but no send, and routines run without approval
-  prompts. Draft + mobile push; never report the missing send as a failure.
-  (2026-08-23)
-- Cloud environment variables are **not** visible to the setup script — session
-  shell only. (2026-08-23)
+- `GH_TOKEN` reads as literal `proxy-injected` when the proxy handles auth —
+  treat as unset. Gmail has `create_draft` but no send. Cloud env vars are
+  session-shell only, not visible to setup scripts. (2026-08-23)
 
 ## Registry gaps
 
-- No component covers generic REST / carrier-rate APIs. Searched "rest api",
-  "http polling", "rate limit". Wrote a custom `CarrierRateFeedComponent`.
-  Worth contributing back to the registry. (2026-08-24)
+- No component for generic REST/carrier-rate APIs (searched "rest api",
+  "http polling", "rate limit", "carrier", "freight", "webhook source",
+  "generic api"). Wrote custom `CarrierRateFeedComponent`/
+  `ShipmentEventsComponent`. Worth contributing to the registry. (2026-08-24)
 
 ## Dead ends — don't retry these
 
-- Do not put `dbt_project/` at the project root. It will not ship. (2026-08-24)
+- Do not put `dbt_project/` at the project root — it will not ship.
 - Do not rely on `.gitignore`d build artifacts being present at runtime.
-  (2026-08-24)
+- Do not assume a local-file warehouse persists across separate Dagster+
+  Serverless runs (see platform-constraint section above).

@@ -1,0 +1,54 @@
+[project]
+name = "northwind_logistics"
+requires-python = ">=3.10,<3.15"
+version = "0.1.0"
+dependencies = [
+    "dagster==1.13.19",
+    "dagster-cloud>=1.13.19",
+    "dagster-dbt>=0.29.19",
+    "dagster-duckdb>=0.29.19",
+    "dagster-duckdb-pandas>=0.29.19",
+    "dagster-fivetran>=0.29.19",
+    "dagster-snowflake>=0.29.19",
+    "dagster-snowflake-pandas>=0.29.19",
+    "dbt-duckdb>=1.11.0",
+    "pex>=2.59.5",
+]
+
+[dependency-groups]
+dev = [
+    "dagster-dg-cli",
+    "dagster-webserver",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# hatchling's default wheel already includes most of `.local_defs_state/`
+# (it only reads the *root* .gitignore, not the nested
+# `.local_defs_state/.gitignore: *` that ignores the whole directory) --
+# EXCEPT any path segment matched by the root .gitignore's generic `target/`
+# rule, which is exactly where dbt's compiled manifest.json lives. Verified
+# by inspecting a built wheel: without this force-include, manifest.json is
+# silently absent and the deployed code location fails to load. Force-
+# including the whole `.local_defs_state` tree here instead double-adds
+# files hatchling already includes by default (`ValueError: A second file is
+# being added to the wheel archive at the same path`) -- so this targets
+# only the actual gap. (2026-08-24)
+force-include = { "pyproject.toml" = "pyproject.toml", "src/northwind_logistics/defs/.local_defs_state/DbtProjectComponent__dbt_project__/project/target/manifest.json" = "northwind_logistics/defs/.local_defs_state/DbtProjectComponent__dbt_project__/project/target/manifest.json" }
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "northwind_logistics"
+registry_modules = [
+    "northwind_logistics.components.*",
+]
+
+
+
+[project.entry-points."dagster_dg_cli.registry_modules"]
+northwind_logistics_components = "northwind_logistics.components"

@@ -1,0 +1,31 @@
+name: "northwind_logistics"
+version: "1.0.0"
+config-version: 2
+
+profile: "northwind_logistics"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Defaults cover the whole demo window. Dagster overrides these per
+  # partition via `--vars` (see `defs/transformation/*/defs.yaml`); the
+  # untracked warehouse-reseed pass in `components/dbt_project.py` relies on
+  # these defaults to rebuild the full history in one shot.
+  min_date: "2026-08-15"
+  max_date: "2026-08-24"
+
+models:
+  northwind_logistics:
+    staging:
+      snapshot:
+        +materialized: view
+        +schema: staging
+      daily:
+        +materialized: incremental
+        +incremental_strategy: delete+insert
+        +schema: staging
+    marts:
+      +materialized: incremental
+      +incremental_strategy: delete+insert
+      +schema: marts
