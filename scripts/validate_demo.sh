@@ -41,24 +41,27 @@ echo "==> [4/5] dg list components"
 dg list components || echo "    WARNING: component listing failed; check the registry entry point"
 
 echo "==> [5/5] full materialize (the real test)"
-LAUNCH_OUTPUT="$(dg launch --assets '*' 2>&1)" && LAUNCH_STATUS=0 || LAUNCH_STATUS=$?
-if [[ "$LAUNCH_STATUS" -ne 0 ]]; then
-  if echo "$LAUNCH_OUTPUT" | grep -q "Asset has partitions, but no '--partition' option was provided"; then
-    # `dg launch --assets '*'` has no partition-range mode for mixed
-    # partition schemes (verified 2026-08-24) -- it always fails immediately
-    # for a project with any partitioned asset. Since partitions are close to
-    # mandatory per the feature floor, most demos will hit this. Don't fail
-    # the gate over a CLI limitation; the caller is expected to validate
-    # partitioned materialization itself (e.g. loop `dg launch --assets X
-    # --partition <key>` per layer, or a same-process script using
-    # `dagster.materialize()` to avoid per-call CLI startup cost).
-    echo "    WARNING: project has partitioned assets -- '*' cannot cover them in one shot."
-    echo "    This script only proved unpartitioned assets materialize. Validate partitioned"
-    echo "    assets separately before deploying."
-  else
-    echo "$LAUNCH_OUTPUT"
-    fail "assets loaded but did not materialize -- do NOT deploy this"
-  fi
+# `dg launch --assets '*'` exits immediately on any partitioned asset with
+# "Asset has partitions, but no '--partition' option was provided". Partitions
+# are near-mandatory per the feature floor, so this gate only works if the
+# build ships its own harness -- it knows its partition keys; this script
+# doesn't.
+if [[ -f validate_e2e.py ]]; then
+  echo "    using project harness: validate_e2e.py"
+  python validate_e2e.py \
+    || fail "end-to-end harness failed -- do NOT deploy this"
+elif dg launch --assets '*' 2>/dev/null; then
+  echo "    unpartitioned project; dg launch succeeded"
+else
+  fail "no validate_e2e.py and 'dg launch --assets \"*\"' failed.
+    Partitioned projects MUST ship validate_e2e.py at the project root.
+    It should, at minimum:
+      - build the implicit job:
+          job = defs.resolve_implicit_job_def_def_for_assets(asset_keys)
+      - execute each partition:
+          job.execute_in_process(instance=..., partition_key=k,
+                                 asset_selection=...)
+      - exit non-zero on any failure"
 fi
 
 echo

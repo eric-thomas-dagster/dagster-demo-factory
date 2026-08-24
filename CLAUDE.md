@@ -19,14 +19,19 @@ cloned repo.
 
 ## Read LEARNINGS.md before building
 
-`LEARNINGS.md` at the repo root accumulates verified facts from previous runs —
-correct command forms, component schemas, registry gaps, known dead ends. Read
-it after this file and before writing anything. Runs have no memory of each
-other; that file is the only continuity.
+`LEARNINGS.md` at the repo root holds verified facts from previous runs —
+command forms, schemas, version quirks, known dead ends. Read it after this file
+and before writing anything. Runs have no memory of each other; that file is the
+only continuity.
 
-Every run updates it (step 10 of the Demo Factory prompt), including failed
-runs. Record only what you verified by running it or reading source — a wrong
-entry is worse than none, because the next run will trust it.
+It's a *maintained* file, not an append-only log. Every run invalidates wrong
+entries, prunes what no longer earns its context cost, and only then appends
+what it verified (step 10 of the Demo Factory prompt). Record only what you
+confirmed by running it or reading source — a wrong entry is worse than none,
+because the next run will trust it.
+
+**Facts go in `LEARNINGS.md`; rules go here.** If something should change how
+every future build behaves, it belongs in this file, not that one.
 
 ## Use `dg`, never `dagster`
 
@@ -61,7 +66,9 @@ green:
   what they assert, and where the result surfaces. They don't need to see one
   go red to understand it.
 - **Freshness policies** — configured on the assets they'd page someone about.
-- **Retry policies** — set where a flaky source would justify them.
+- **Retry policies** — *only where a source is genuinely flaky.* A
+  decorative retry on a deterministic synthetic source invites a question we'd
+  lose. Skipping one and saying why beats padding coverage.
 - **Automation conditions** — showing what would recompute, and when.
 - **Alerting hooks / sensors** — configured, pointing somewhere plausible.
 
@@ -252,7 +259,16 @@ drift between runs.
 catches. An all-green asset graph doesn't demonstrate data quality tooling.
 
 **Validate before publishing.** `dg check defs`, `dg list defs`, `dg check
-yaml`, and an actual `dg launch --assets '*'` must all pass.
+yaml`, and a real end-to-end materialization must all pass.
+
+**Every build ships `validate_e2e.py` at the project root.** `dg launch --assets
+'*'` exits immediately on any partitioned asset, and partitions are near
+mandatory here, so a generic runner can't gate these projects — the build knows
+its own partition keys and must provide the harness. It builds the implicit job
+via `defs.resolve_implicit_job_def_def_for_assets(asset_keys)`, executes each
+partition with `job.execute_in_process(instance=..., partition_key=k,
+asset_selection=...)`, and exits non-zero on any failure.
+`scripts/validate_demo.sh` calls it.
 A project that loads but crashes on materialize must not be deployed.
 
 **Their vocabulary, not ours.** Assets named `member_eligibility_daily`, not
