@@ -1,4 +1,14 @@
 {
+  "brief-ready": [
+    {
+      "company": "ISO New England",
+      "slug": "iso-new-england",
+      "status": "brief-ready",
+      "demo_date": "2026-08-26",
+      "brief_path": "briefs/2026-08-26-iso-new-england.md",
+      "timestamp": "2026-08-24T21:00:00Z"
+    }
+  ],
   "built": [
     {
       "company": "Northwind Logistics",
