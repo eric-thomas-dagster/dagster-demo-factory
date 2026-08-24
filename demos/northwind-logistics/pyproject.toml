@@ -28,7 +28,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
+# Both force-included paths are gitignored, and hatchling excludes gitignored
+# files from the wheel by default -- they then go missing at runtime in
+# Dagster+ with a confusing path error. `.local_defs_state/` holds the
+# compiled dbt manifest and the Fivetran workspace snapshot that
+# state-backed components load their definitions from; regenerate it with
+# `dg utils refresh-defs-state` before building. See LEARNINGS.md.
 force-include = { "pyproject.toml" = "pyproject.toml" }
+artifacts = ["src/northwind_logistics/defs/.local_defs_state/**"]
 
 [tool.dg]
 directory_type = "project"
