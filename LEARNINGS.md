@@ -91,9 +91,20 @@ it checks every item below in about 20 seconds.
   caught path issues early on 2026-08-24 and is cheap. (2026-08-24)
 - Run `dg check defs` after each layer (ingestion → SaaS → dbt), not once at the
   end. Failures localize instead of compounding. (2026-08-24)
-- Set `profiles.yml` to require the env var with no relative-path fallback —
-  a fallback default masks packaging errors locally that then fail in Dagster+.
-  (2026-08-24)
+- Set `profiles.yml` to a **working default path** with the env var as an
+  optional override (`{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`).
+  An earlier entry here advised requiring the env var with no fallback, to stop
+  it masking packaging errors. That was wrong: the 2026-08-24 build shipped a
+  demo that wouldn't start without `NORTHWIND_DEMO_DUCKDB_PATH` set by hand.
+  Catch packaging errors with `preflight_deploy.sh` instead — never at the cost
+  of a demo that can't be run. (2026-08-24)
+- **Dagster+ Serverless storage is ephemeral.** Each run is a fresh container;
+  local DuckDB files do not persist between runs. Any sequence spanning
+  multiple runs — including fail → rematerialize → recover — works locally and
+  silently breaks in Serverless. Give the interactive demo via `dg dev`; treat
+  the Dagster+ deployment as proof the project loads. (2026-08-24)
+- A code location reporting `LOADED` means the definitions parsed. It does
+  **not** mean assets materialize successfully in the cloud. (2026-08-24)
 
 ## Environment
 
@@ -104,6 +115,18 @@ it checks every item below in about 20 seconds.
   (2026-08-23)
 - Cloud environment variables are **not** visible to the setup script — session
   shell only. (2026-08-23)
+
+## Component schemas and APIs
+
+- **dbt asset `kinds` come from the manifest's `adapter_type`**, so a
+  DuckDB-backed demo badges every model `duckdb`. There is no `get_kinds` hook
+  on `DagsterDbtTranslator` — subclass it and override `get_asset_spec`, then
+  `spec.replace_attributes(kinds={"dbt", "snowflake"})`. Signature:
+  `get_asset_spec(self, manifest, unique_id, project) -> dg.AssetSpec`.
+  Verified against dagster-dbt 2026-08-24. (2026-08-24)
+- Regular assets and `AssetSpec`s accept `kinds={"snowflake"}` directly. Max 3
+  kinds per asset. Badge the prospect's stack, not the execution engine.
+  (2026-08-24)
 
 ## Registry gaps
 
@@ -121,8 +144,4 @@ it checks every item below in about 20 seconds.
   `healed_partitions` asset, which floats disconnected in the lineage graph and
   immediately reads as scaffolding. Op jobs are for real side-effectful work a
   prospect would recognise (shipping logs, notifications), not demo state.
-  (2026-08-24)
-
-- Do not put `dbt_project/` at the project root. It will not ship. (2026-08-24)
-- Do not rely on `.gitignore`d build artifacts being present at runtime.
   (2026-08-24)

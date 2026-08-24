@@ -92,19 +92,32 @@ matching their real world. Target 12–25 assets. -->
 
 - **What must be mocked:** <!-- systems we have no credentials for -->
 - **What can be real:** <!-- DuckDB, local files, public APIs -->
-- **Planted anomaly:** <!-- which partition breaks, which check catches it -->
-- **Recovery:** <!-- Assets are idempotent: recovery is just rematerializing
-     the partition, because the SOURCE changed. Model late data as source
-     arrival timing inside the mock. NEVER a heal asset, heal job, or reset
-     object — a demo-control node in the lineage graph tells the prospect
-     they're looking at scaffolding. -->
+- **Asset kinds to display:** <!-- The prospect's stack, NOT the execution
+     engine — e.g. snowflake, fivetran, dbt. DuckDB runs it; the UI shouldn't
+     say so. dbt kinds come from the manifest adapter_type, so the translator
+     needs overriding. -->
+- **Failure demonstration:** <!-- no (default) | yes. Default is a GREEN demo:
+     checks, freshness policies, retries, and alerting are configured and
+     visible, and Eric talks through what happens when they fire. Only set yes
+     if a live staged failure is genuinely wanted. -->
+- **If yes — planted anomaly:** <!-- which partition, which check catches it.
+     Recovery is plain rematerialization: model late arrival as source state.
+     Never a heal asset, heal job, or reset object. -->
 - **Demo reset:** <!-- how to re-run this demo a second time. A script or make
      target outside Dagster, operating on the mock source state. -->
 - **Data realism notes:** <!-- cardinalities, date ranges, expected skew -->
 
 ## Money shot
 
-<!-- The 20 seconds that sell it. What's on screen, what I say. -->
+<!-- The 20 seconds that sell it. What's on screen, what I say. Against a
+GREEN graph by default — lineage, checks configured, automation conditions,
+kinds matching their stack. -->
+
+## Capability talk track
+
+<!-- What Eric says while the graph sits green. For each capability built in:
+what it does, what happens when it fires, and which pain from above it answers.
+This is the substitute for staging a live failure. -->
 
 ## Explicitly out of scope
 

@@ -47,6 +47,99 @@ suggests it.
 `--config`. Note `dg launch` uses `--assets`; the legacy CLI used `--select`.
 Getting this wrong wastes turns on flag errors.
 
+## Demos run green — capabilities are shown, not triggered
+
+**Default: everything materializes successfully.** Do not build a demo that
+deliberately fails on screen. Eric's demo style is to show a working pipeline
+and *talk through* the capabilities it has — checks, retries, alerting,
+recovery — rather than stage a live failure and recover from it.
+
+So build the capabilities in, fully configured and visible, and leave them
+green:
+
+- **Asset checks** — present, wired, passing. The prospect sees they exist,
+  what they assert, and where the result surfaces. They don't need to see one
+  go red to understand it.
+- **Freshness policies** — configured on the assets they'd page someone about.
+- **Retry policies** — set where a flaky source would justify them.
+- **Automation conditions** — showing what would recompute, and when.
+- **Alerting hooks / sensors** — configured, pointing somewhere plausible.
+
+The talk track is *"here's what happens when this breaks"*, delivered against a
+green graph. That's a stronger demo than a broken one and it removes the risk
+of a staged failure not recovering live.
+
+**Only stage a live failure when the brief explicitly asks for it**, under
+`Failure demonstration: yes`. It's opt-in, never the default. When it is asked
+for, recovery is still plain rematerialization — see the idempotency rule
+below.
+
+## Match the prospect's stack visually, even when execution is local
+
+The engine can be DuckDB while the demo *looks* like their warehouse. Asset
+`kinds` drive the icons and badges in the Dagster UI, and getting them right is
+most of the visual fidelity for very little effort.
+
+- On regular assets and `AssetSpec`s, set `kinds={"snowflake"}` (or
+  `databricks`, `bigquery`, `redshift`) to match the prospect's stack. Max 3
+  kinds per asset.
+- **For dbt assets, kinds are derived from the manifest's `adapter_type`**, so a
+  DuckDB-backed project badges everything `duckdb` by default. Override by
+  subclassing the translator:
+
+  ```python
+  class DemoDbtTranslator(DagsterDbtTranslator):
+      def get_asset_spec(self, manifest, unique_id, project):
+          spec = super().get_asset_spec(manifest, unique_id, project)
+          return spec.replace_attributes(kinds={"dbt", "snowflake"})
+  ```
+
+- Do the same for ingestion assets: badge them `fivetran`, `airbyte`, `s3`,
+  `kafka` as their real stack dictates.
+- This is presentation, not deception. It's demo mode — the point is showing we
+  can orchestrate *their* stack, and `demo_mode: false` plus real credentials
+  runs against the real thing. Keep the asset names, schemas, and structure
+  honest; the badge just stops DuckDB from being a distraction.
+
+## A demo must run with zero setup
+
+After `git clone`, `uv sync`, and `dg dev`, the demo must work. No env vars to
+set, no credentials, no manual file creation. That is the entire point of demo
+mode.
+
+- **Every demo-mode setting needs a working default.** Env vars may *override*
+  configuration; they must never *gate* it. A required-with-no-default env var
+  is a bug.
+- Storage paths default to somewhere inside the project (e.g.
+  `<project>/demo_data/demo.duckdb`), created on first use.
+- If a demo needs a secret to run in demo mode, the demo mode is wrong.
+- Verify by cloning fresh into a temp dir and running it. Working in the build
+  directory proves nothing — that environment has state the prospect's doesn't.
+
+## Dagster+ Serverless storage is ephemeral — plan for it
+
+Each run executes in a fresh container. **Local files, including DuckDB
+databases, do not persist between runs.** A code location reporting `LOADED`
+only means the definitions parsed; it says nothing about whether assets
+materialize.
+
+The consequence matters for these demos: the fail → rematerialize → recover
+sequence spans *multiple runs*, so with a local DuckDB path it will work
+locally and silently break in Serverless.
+
+So:
+
+- **Give the live demo locally with `dg dev`.** That's where the interactive
+  story works, and it's where you have control on a shared screen.
+- **Dagster+ deployment proves the project is real** — it loads, the graph
+  renders, the code location is genuine. Treat that as the proof point, not as
+  the place you click through the recovery sequence.
+- If a demo genuinely needs cross-run persistence in Dagster+, back the
+  warehouse with something durable (S3-backed storage, MotherDuck, or the
+  prospect's actual warehouse) and say so explicitly in the brief.
+- **Say which mode each part of the demo runs in** in the README and the
+  notification, so nobody discovers this on a shared screen.
+
 ## Assets are idempotent — the source changes, not the asset
 
 Recovery is never an action inside Dagster. There is no "heal" step, no reset
