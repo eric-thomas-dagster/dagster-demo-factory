@@ -44,8 +44,7 @@ fi
 if [[ "$KEEP_LOCATION" == "0" ]]; then
   if [[ -n "${DAGSTER_CLOUD_API_TOKEN:-}" ]]; then
     echo "    deleting Dagster+ location $LOCATION"
-    dagster-cloud deployment delete-location \
-      --location-name "$LOCATION" \
+    dagster-cloud deployment delete-location "$LOCATION" \
       --organization "${DAGSTER_CLOUD_ORGANIZATION:?not set}" \
       --deployment "${DAGSTER_CLOUD_DEPLOYMENT:?not set}" \
       --api-token "$DAGSTER_CLOUD_API_TOKEN" 2>/dev/null \
