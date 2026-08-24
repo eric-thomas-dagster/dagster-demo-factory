@@ -32,6 +32,13 @@ LOCATION="demo-$SLUG"
 
 export PATH="$HOME/.local/bin:$PATH"
 
+# `dagster-cloud` and `dg` are project dependencies, so they live in the
+# project's venv, not on the ambient PATH. Without this the deploy dies with
+# a bare "dagster-cloud: command not found" AFTER validation has passed,
+# which reads like a deploy failure rather than a missing activation.
+# shellcheck disable=SC1091
+source "$PROJECT_DIR/.venv/bin/activate"
+
 echo "==> Re-validating before deploy"
 "$REPO_ROOT/scripts/validate_demo.sh" "$SLUG" "$PKG"
 
