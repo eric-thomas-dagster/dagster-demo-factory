@@ -3,16 +3,15 @@
     {
       "company": "Northwind Logistics",
       "slug": "northwind-logistics",
-      "status": "deployed",
+      "status": "brief-ready",
       "demo_date": "2026-08-24",
       "brief_path": "briefs/2026-08-24-northwind-logistics.md",
       "timestamp": "2026-08-23T20:12:55Z",
-      "reset_at": "2026-08-23T19:49:32",
+      "reset_at": "2026-08-24T11:30:57",
       "deployed_at": "2026-08-24T01:35:00Z",
       "location_name": "demo-northwind-logistics",
       "deployment": "prod",
-      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/3",
-      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-northwind-logistics"
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/3"
     }
   ]
 }
