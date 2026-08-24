@@ -1,10 +1,10 @@
 """Reference pattern: adding `demo_mode` to a real Dagster component.
 
-Read this before writing any demo component. It encodes the one design rule
-that makes these demos survive contact with a technical audience.
+Read this before writing any demo component. It encodes the two design rules
+that make these demos survive contact with a technical audience.
 
-THE RULE
---------
+RULE 1 -- SUBCLASS, DON'T REIMPLEMENT
+--------------------------------------
 Subclass the real component. Fake ONLY the outermost I/O call -- the single
 method that crosses the network. Everything else runs the real code path.
 
@@ -12,29 +12,44 @@ Asset keys, asset specs, partition definitions, dependency edges, metadata,
 check definitions, and the YAML schema MUST be identical whether `demo_mode`
 is true or false.
 
-WHY IT MATTERS
---------------
 The demo's credibility rests on one moment: the prospect asks "does this
 actually work against our Snowflake?" and we flip `demo_mode: false`, drop in
-their credentials, and it runs. That moment only works if demo mode was never
-a separate implementation.
-
-The failure mode to avoid is a "demo component" that hand-rolls a plausible
-asset graph with hardcoded data. It looks the same in a screenshot and is
-worthless the moment anyone asks a real question -- and a data engineer in a
-POC evaluation always asks a real question.
-
-Concretely, this means:
+their credentials, and it runs. That only works if demo mode was never a
+separate implementation.
 
   DON'T  write a new Component that emits similar-looking assets
   DON'T  branch inside build_defs to construct different asset specs
   DON'T  swap the partition definition, even to make the demo run faster
   DO     subclass and override the fetch/execute boundary only
   DO     let the real component build every Definitions object
+
+RULE 2 -- ASSETS ARE IDEMPOTENT; THE SOURCE CHANGES, NOT THE ASSET
+-------------------------------------------------------------------
+Recovery is never an action inside Dagster. There is no heal step, no reset
+asset, no repair job. Rematerializing a partition re-reads the source and picks
+up whatever is there now -- exactly as it would in production.
+
+So a late-arriving feed is modelled as SOURCE STATE, not as a demo toggle:
+the carrier's API has no rows for that partition at 2pm, and has them at 4pm.
+The asset is unchanged. Its input changed.
+
+  DON'T  create a `healed_partitions` or `demo_control` asset
+  DON'T  create a heal/reset job (op jobs are for real side-effectful work
+         a prospect would recognise, like shipping logs -- not demo state)
+  DON'T  require a YAML edit or a terminal command mid-demo
+  DO     model arrival timing inside the mocked source system
+  DO     let a plain rematerialize be the entire recovery story
+
+Mock source state lives in `demo_data/`, representing the upstream system's own
+state. Dagster reads it and never writes it as part of the demo narrative.
+Resetting the demo is an operation on that mock source, run from a script or
+make target OUTSIDE Dagster.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 import dagster as dg
@@ -47,9 +62,14 @@ from components.ingestion.snowflake_query import SnowflakeQueryComponent
 
 from demo_data.generators import generate_frame_for_query
 
+# The mocked source system's own state. NOT Dagster state, NOT a demo toggle --
+# this stands in for "what the upstream API currently has". Kept out of the
+# project package so it is obviously not part of the pipeline.
+_SOURCE_STATE = Path(__file__).parent.parent / "demo_data" / "_source_state.json"
+
 
 class DemoSnowflakeQueryComponent(SnowflakeQueryComponent):
-    """`SnowflakeQueryComponent` that can serve synthetic rows instead of querying.
+    """`SnowflakeQueryComponent` that reads a simulated source instead of Snowflake.
 
     Subclasses rather than replaces the real component, so the asset graph,
     partitions, metadata, and YAML schema are inherited unchanged. The only
@@ -63,7 +83,7 @@ class DemoSnowflakeQueryComponent(SnowflakeQueryComponent):
     demo_mode: bool = Field(
         default=True,
         description=(
-            "Serve deterministic synthetic rows instead of querying Snowflake. "
+            "Read from the simulated source instead of querying Snowflake. "
             "Set false and supply real credentials to run against a live account."
         ),
     )
@@ -82,12 +102,14 @@ class DemoSnowflakeQueryComponent(SnowflakeQueryComponent):
             "volume; the number is visible in asset metadata."
         ),
     )
-    demo_anomaly_partition: str | None = Field(
-        default=None,
+    demo_late_partitions: list[str] = Field(
+        default_factory=list,
         description=(
-            "Partition key to deliberately corrupt so a downstream asset check "
-            "fails. This is the demo's money shot -- an all-green graph proves "
-            "nothing about data quality tooling."
+            "Partition keys the simulated source has NOT yet received. The first "
+            "read of one of these returns nothing, so the blocking check fails. "
+            "The source then 'receives' the data, and a plain rematerialize "
+            "succeeds -- no heal step, because assets are idempotent and it is "
+            "the source that changed."
         ),
     )
 
@@ -97,25 +119,39 @@ class DemoSnowflakeQueryComponent(SnowflakeQueryComponent):
         query: str,
         **kwargs: Any,
     ) -> pd.DataFrame:
-        """Return query results, synthetically when `demo_mode` is set.
+        """Return query results, from the simulated source when `demo_mode` is set.
 
         This is the entire seam. `_execute_query` is the innermost method that
         actually opens a Snowflake connection; everything upstream of it --
         asset construction, partition mapping, metadata emission -- is the real
         component's code and runs identically in both modes.
 
-        When overriding this pattern for a different component, find the
-        equivalent single method and override only that one. If the component
-        has no such seam, add one by extracting the network call into its own
-        method and upstreaming that refactor to the registry rather than
-        working around it here.
+        When adapting this to a different component, find the equivalent single
+        method and override only that one. If the component has no such seam,
+        add one by extracting the network call into its own method and upstream
+        that refactor to the registry rather than working around it here.
         """
         if not self.demo_mode:
             return super()._execute_query(context, query, **kwargs)
 
-        partition_key = (
-            context.partition_key if context.has_partition_key else None
-        )
+        partition_key = context.partition_key if context.has_partition_key else None
+
+        if partition_key is not None and not self._source_has(partition_key):
+            # The upstream system genuinely has nothing yet. Return an empty
+            # frame with the right schema so the blocking check fails on real
+            # emptiness rather than on a special-cased demo branch.
+            self._mark_source_received(partition_key)
+            context.log.info(
+                "Simulated source has no rows for %s yet (late feed). "
+                "The data lands after this read; rematerialize to pick it up.",
+                partition_key,
+            )
+            return generate_frame_for_query(
+                query=query,
+                row_count=0,
+                seed=self.demo_seed,
+                partition_key=partition_key,
+            )
 
         frame = generate_frame_for_query(
             query=query,
@@ -124,51 +160,53 @@ class DemoSnowflakeQueryComponent(SnowflakeQueryComponent):
             partition_key=partition_key,
         )
 
-        if partition_key is not None and partition_key == self.demo_anomaly_partition:
-            frame = _inject_anomaly(frame)
-            context.log.info(
-                "Demo mode: injected anomaly into partition %s so the downstream "
-                "freshness/quality check has something to catch.",
-                partition_key,
-            )
-
         # Mirror the metadata the real path emits, so the UI looks identical.
         context.add_output_metadata(
             {
                 "dagster/row_count": len(frame),
-                "demo_mode": True,
                 "source": dg.MetadataValue.text(
-                    "synthetic -- set demo_mode: false in defs.yaml to query Snowflake"
+                    "simulated -- set demo_mode: false in defs.yaml to query Snowflake"
                 ),
             }
         )
         return frame
 
+    # -- simulated source system state ------------------------------------
+    # This models what the upstream API has, not anything about Dagster. The
+    # asset stays idempotent: it reads the source and reports what it finds.
 
-def _inject_anomaly(frame: pd.DataFrame) -> pd.DataFrame:
-    """Corrupt a frame in a way the demo's asset checks are built to detect.
+    def _source_has(self, partition_key: str) -> bool:
+        if partition_key not in self.demo_late_partitions:
+            return True
+        return partition_key in _read_source_state().get("received", [])
 
-    Kept deliberately crude and obvious: nulls in a non-nullable business key
-    plus a negative amount. The point is for the check failure to be legible
-    when I click into it on a shared screen, not for the corruption to be subtle.
-    """
-    corrupted = frame.copy()
-    n_null = max(1, len(corrupted) // 100)
-    corrupted.loc[corrupted.index[:n_null], corrupted.columns[0]] = None
-    if "amount" in corrupted.columns:
-        corrupted.loc[corrupted.index[:n_null], "amount"] = -1.0
-    return corrupted
+    def _mark_source_received(self, partition_key: str) -> None:
+        state = _read_source_state()
+        received = set(state.get("received", []))
+        received.add(partition_key)
+        state["received"] = sorted(received)
+        _SOURCE_STATE.parent.mkdir(parents=True, exist_ok=True)
+        _SOURCE_STATE.write_text(json.dumps(state, indent=2))
+
+
+def _read_source_state() -> dict[str, Any]:
+    if not _SOURCE_STATE.exists():
+        return {}
+    try:
+        return json.loads(_SOURCE_STATE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 # ---------------------------------------------------------------------------
-# Corresponding defs.yaml -- note that flipping the demo off is one line.
+# Corresponding defs.yaml -- flipping the demo off is one line.
 #
 #   type: demo_components.DemoSnowflakeQueryComponent
 #   attributes:
 #     demo_mode: true                     # <-- the only thing that changes
 #     demo_seed: 20260824
 #     demo_row_count: 50000
-#     demo_anomaly_partition: "2026-08-19"
+#     demo_late_partitions: ["2026-08-21"]
 #     # --- everything below is the real component's schema, untouched ---
 #     query: |
 #       select claim_id, member_id, provider_npi, amount, adjudicated_at
@@ -181,6 +219,15 @@ def _inject_anomaly(frame: pd.DataFrame) -> pd.DataFrame:
 #     snowflake:
 #       account: "{{ env.SNOWFLAKE_ACCOUNT }}"
 #       warehouse: "{{ env.SNOWFLAKE_WAREHOUSE }}"
+#
+# Demo flow, with no demo-only objects anywhere in the graph:
+#   1. Materialize everything. The late partition comes back empty; the
+#      blocking check fails; downstream refuses to compute.
+#   2. Rematerialize just that partition. The source now has the data.
+#      Downstream recomputes via its automation condition. Graph goes green.
+#
+# Reset for the next demo (outside Dagster, never a Dagster object):
+#   make reset-demo      ->    rm -f demo_data/_source_state.json
 # ---------------------------------------------------------------------------
 
 
@@ -200,6 +247,6 @@ def _inject_anomaly(frame: pd.DataFrame) -> pd.DataFrame:
 #           return _FakeConnection(seed=self.demo_seed)
 #
 # Then point the real component at the demo resource in defs.yaml. The
-# component is completely unmodified -- which is the strongest version of
-# this pattern, and the one to reach for first.
+# component is completely unmodified -- the strongest version of this pattern,
+# and the one to reach for first.
 # ---------------------------------------------------------------------------
