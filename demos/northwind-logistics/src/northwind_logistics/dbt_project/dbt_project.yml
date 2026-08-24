@@ -1,0 +1,30 @@
+name: "northwind_logistics"
+version: "1.0.0"
+config-version: 2
+
+profile: "northwind_logistics"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Defaults cover the whole demo window -- these models are small,
+  # full-refresh transformations over synthetic data, not incremental
+  # builds scoped to one partition. Dagster's partition bookkeeping (which
+  # partition triggered this run, per-partition checks and automation) is
+  # independent of dbt's own execution granularity here.
+  min_date: "2026-08-15"
+  max_date: "2026-08-23"
+
+models:
+  northwind_logistics:
+    staging:
+      snapshot:
+        +materialized: view
+        +schema: staging
+      daily:
+        +materialized: table
+        +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts

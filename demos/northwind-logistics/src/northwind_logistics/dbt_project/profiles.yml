@@ -1,0 +1,21 @@
+northwind_logistics:
+  target: "{{ env_var('NORTHWIND_DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # `definitions.py` sets this env var to a working project-relative
+      # default (`demo_data/demo.duckdb`) before Dagster loads any defs, so
+      # this always resolves even with zero manual setup. Override it to
+      # point dbt at a different DuckDB file without touching this profile.
+      path: "{{ env_var('NORTHWIND_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    live:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: "marts"
+      threads: 4

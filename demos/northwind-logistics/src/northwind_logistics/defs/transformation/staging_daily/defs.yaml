@@ -1,0 +1,22 @@
+type: northwind_logistics.components.NorthwindDbtComponent
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_staging_daily
+  select: "carrier_rate_validated shipment_events_clean"
+  translation:
+    group_name: validation
+    partitions_def: "{{ dg.DailyPartitionsDefinition(start_date='2026-08-15', end_date='2026-08-25', timezone='America/New_York') }}"
+
+post_processing:
+  assets:
+    - target: "staging/carrier_rate_validated"
+      attributes:
+        # Eager here (not gated on its own check) is what lets the recovery
+        # sequence run without a manual click: rematerializing just the
+        # healed carrier_rate_raw partition is enough to bring
+        # carrier_rate_validated back automatically, which is what the
+        # check-gated eager() on carrier_cost_allocation is waiting on.
+        automation_condition: "{{ dg.AutomationCondition.eager() }}"
