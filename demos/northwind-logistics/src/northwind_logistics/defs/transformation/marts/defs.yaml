@@ -1,0 +1,28 @@
+type: northwind_logistics.components.NorthwindDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts
+  select: "shipments_by_lane invoice_line_items carrier_cost_allocation invoice_billing_nightly margin_by_lane_customer"
+  translation:
+    group_name: transformation
+    partitions_def: "{{ dg.DailyPartitionsDefinition(start_date='2026-08-15', end_date='2026-08-25', timezone='America/New_York') }}"
+
+post_processing:
+  assets:
+    - target: "marts/carrier_cost_allocation"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "marts/invoice_billing_nightly"
+      attributes:
+        group_name: reporting
+        freshness_policy: "{{ finance_freshness_policy }}"
+    - target: "marts/margin_by_lane_customer"
+      attributes:
+        group_name: reporting
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+        freshness_policy: "{{ finance_freshness_policy }}"

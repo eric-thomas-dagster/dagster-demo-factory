@@ -1,0 +1,10 @@
+type: northwind_logistics.components.NorthwindDbtComponent
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_staging_snapshot
+  select: "stg_salesforce_accounts stg_zendesk_tickets stg_netsuite_gl_entries"
+  translation:
+    group_name: validation

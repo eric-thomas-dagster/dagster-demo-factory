@@ -1,0 +1,13 @@
+type: northwind_logistics.components.ShipmentEventsComponent
+
+attributes:
+  demo_mode: true
+  demo_seed: 20260824
+  warehouse:
+    demo_mode: true
+    user: "{{ env('SNOWFLAKE_USER', 'demo_user') }}"
+    account: "{{ env.SNOWFLAKE_ACCOUNT }}"
+    password: "{{ env.SNOWFLAKE_PASSWORD }}"
+    database: "{{ env.SNOWFLAKE_DATABASE }}"
+    schema: "{{ env.SNOWFLAKE_SCHEMA }}"
+    warehouse: "{{ env.SNOWFLAKE_WAREHOUSE }}"
