@@ -1,0 +1,17 @@
+type: iso_new_england.components.PostgresLandingComponent
+
+attributes:
+  asset_name: staged_readings
+  source_table: legacy_oracle_extract
+  upstream_asset_key: ["raw", "legacy_oracle_extract"]
+  group_name: landing
+  description: >
+    Interval telemetry landed in the Postgres landing zone, copied from the
+    Oracle extract. Carries the blocking `staged_readings_completeness` check
+    before any dbt model reads from it.
+  landing:
+    demo_mode: true
+    host: "{{ env('ISO_NE_POSTGRES_HOST', 'localhost') }}"
+    database: "{{ env('ISO_NE_POSTGRES_DATABASE', 'iso_ne_demo') }}"
+    username: "{{ env('ISO_NE_POSTGRES_USER', 'demo_user') }}"
+    password: "{{ env.ISO_NE_POSTGRES_PASSWORD }}"

@@ -1,0 +1,30 @@
+type: iso_new_england.components.IsoNeDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts
+  select: "mart_daily_operations_summary mart_source_reliability mart_capacity_trend platform_status_report"
+  translation:
+    group_name: marts
+    partitions_def: "{{ dg.DailyPartitionsDefinition(start_date='2026-08-11', timezone='America/New_York') }}"
+
+post_processing:
+  assets:
+    - target: "marts/mart_daily_operations_summary"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "marts/mart_source_reliability"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "marts/mart_capacity_trend"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "marts/platform_status_report"
+      attributes:
+        group_name: reporting
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+        freshness_policy: "{{ platform_status_freshness_policy }}"

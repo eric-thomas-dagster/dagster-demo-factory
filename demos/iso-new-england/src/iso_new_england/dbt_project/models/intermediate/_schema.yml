@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: int_readings_validated
+    description: "Interval readings enriched with same-day advisory context."
+
+  - name: int_daily_rollup
+    description: "One row per reporting point per day -- interval counts, averages, and estimated-quality counts."
+    columns:
+      - name: interval_count
+        data_tests: [not_null]

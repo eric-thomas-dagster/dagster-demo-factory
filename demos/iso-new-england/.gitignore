@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+MANIFEST
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# mypy / ruff caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# ISO New England demo -- mock source state, never committed, never a
+# Dagster object. Regenerated on first run; reset via `make reset-demo`.
+src/iso_new_england/demo_data/demo.duckdb
+src/iso_new_england/demo_data/_advisory_feed_state.json
+
+# Dagster state-backed component cache (dbt manifest). Gitignored locally,
+# but force-included in the deploy wheel -- see pyproject.toml and LEARNINGS.md.
+.local_defs_state/

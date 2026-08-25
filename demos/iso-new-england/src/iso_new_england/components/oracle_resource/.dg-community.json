@@ -1,0 +1,9 @@
+{
+  "id": "oracle_resource",
+  "name": "OracleResourceComponent",
+  "category": "resource",
+  "ref": "main",
+  "version": "1.0.0",
+  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/resources/oracle_resource/component.py",
+  "installed_at": "2026-08-25T06:12:50+00:00"
+}

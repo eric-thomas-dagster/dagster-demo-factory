@@ -1,0 +1,31 @@
+name: "iso_new_england"
+version: "1.0.0"
+config-version: 2
+
+profile: "iso_new_england"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Wide bound rather than a fixed demo-window end: `external_feed_raw` and
+  # `legacy_oracle_extract` are on an open-ended DailyPartitionsDefinition (see
+  # components/partitions.py) so the sensor can trigger on whatever day the
+  # demo is actually run. These models are small full-refresh transforms over
+  # the whole staged window each run, not incremental builds scoped to one
+  # partition -- Dagster's partition bookkeeping is independent of dbt's own
+  # execution granularity here.
+  min_date: "2026-08-11"
+  max_date: "2026-12-31"
+
+models:
+  iso_new_england:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
