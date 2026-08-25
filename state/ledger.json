@@ -1,5 +1,14 @@
 {
-  "brief-ready": [],
+  "brief-ready": [
+    {
+      "company": "Kapitus",
+      "slug": "kapitus",
+      "status": "brief-ready",
+      "demo_date": "TBD",
+      "brief_path": "briefs/2026-08-25-kapitus.md",
+      "timestamp": "2026-08-25T22:15:00Z"
+    }
+  ],
   "built": [
     {
       "company": "Stellantis Financial Services",
