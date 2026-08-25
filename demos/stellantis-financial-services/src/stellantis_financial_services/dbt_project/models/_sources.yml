@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: loan_originations
+        meta:
+          dagster:
+            asset_key: ["raw", "loan_originations"]
+      - name: lease_originations
+        meta:
+          dagster:
+            asset_key: ["raw", "lease_originations"]
+      - name: payment_transactions
+        meta:
+          dagster:
+            asset_key: ["raw", "payment_transactions"]
+      - name: dealer_floorplan_feed
+        meta:
+          dagster:
+            asset_key: ["raw", "dealer_floorplan_feed"]
+      - name: credit_bureau_pull
+        meta:
+          dagster:
+            asset_key: ["raw", "credit_bureau_pull"]

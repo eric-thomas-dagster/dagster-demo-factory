@@ -1,0 +1,14 @@
+type: stellantis_financial_services.components.VendorFeedComponent
+
+attributes:
+  feed: dealer_floorplan
+  demo_mode: true
+  demo_seed: 20260825
+  # The one source in this demo that is genuinely flaky: floorplan advance
+  # batches are dealer-submitted (not system-to-system), so transient
+  # send failures are a real characteristic of this feed, not a decorative
+  # retry on a deterministic source -- see CLAUDE.md's retry-policy guidance.
+  retryable: true
+  landing:
+    demo_mode: true
+    storage_account: "{{ env('SFS_AZURE_STORAGE_ACCOUNT', 'sfsdemo') }}"

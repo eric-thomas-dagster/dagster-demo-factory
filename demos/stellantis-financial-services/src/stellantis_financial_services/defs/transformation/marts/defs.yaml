@@ -1,0 +1,33 @@
+type: stellantis_financial_services.components.SfsDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts
+  select: "fact_loan_portfolio fact_delinquency_snapshot abs_pool_eligibility gl_reconciliation_summary customer_360"
+  translation:
+    group_name: marts
+    partitions_def: "{{ dg.DailyPartitionsDefinition(start_date='2026-08-01', timezone='America/Detroit') }}"
+
+post_processing:
+  assets:
+    - target: "marts/fact_loan_portfolio"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "marts/fact_delinquency_snapshot"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+        freshness_policy: "{{ delinquency_snapshot_freshness }}"
+    - target: "marts/abs_pool_eligibility"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+        freshness_policy: "{{ abs_pool_freshness }}"
+    - target: "marts/gl_reconciliation_summary"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "marts/customer_360"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"

@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: stg_loan_originations
+    description: "Typed auto loan origination contracts from the dealer-submitted feed."
+    columns:
+      - name: loan_id
+        data_tests: [unique, not_null]
+      - name: dealer_id
+        data_tests: [not_null]
+      - name: amount_financed
+        data_tests: [not_null]
+
+  - name: stg_lease_originations
+    description: "Typed lease origination contracts from the dealer-submitted feed."
+    columns:
+      - name: lease_id
+        data_tests: [unique, not_null]
+      - name: dealer_id
+        data_tests: [not_null]
+
+  - name: stg_payment_transactions
+    description: "Typed servicer payment/collections transactions."
+    columns:
+      - name: payment_id
+        data_tests: [unique, not_null]
+      - name: contract_id
+        data_tests: [not_null]
+
+  - name: stg_delinquency_events
+    description: "Payments 30+ days past due -- one row per delinquency event."
+    columns:
+      - name: payment_id
+        data_tests: [unique, not_null]
+      - name: delinquency_severity
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["moderate", "severe"]
+
+  - name: dim_dealer
+    description: "One row per dealer across all dealer-submitted feeds."
+    columns:
+      - name: dealer_id
+        data_tests: [unique, not_null]
+
+  - name: dim_borrower
+    description: "One row per borrower, joined to their credit bureau pull."
+    columns:
+      - name: borrower_id
+        data_tests: [unique, not_null]
