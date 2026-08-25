@@ -1,5 +1,14 @@
 {
-  "brief-ready": [],
+  "brief-ready": [
+    {
+      "company": "Stellantis Financial Services",
+      "slug": "stellantis-financial-services",
+      "status": "brief-ready",
+      "demo_date": "TBD",
+      "brief_path": "briefs/2026-08-25-stellantis-financial-services.md",
+      "timestamp": "2026-08-25T13:47:36Z"
+    }
+  ],
   "built": [
     {
       "company": "ISO New England",
