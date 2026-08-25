@@ -31,7 +31,7 @@ dg check yaml || fail "component YAML is malformed"
 
 echo "==> [3/5] dg list defs"
 dg list defs || fail "could not list definitions"
-ASSET_COUNT="$(dg list defs --json 2>/dev/null | grep -c '"assetKey"' || true)"
+ASSET_COUNT="$(dg list defs --json 2>/dev/null | grep -c '"asset_key"' || true)"
 echo "    assets discovered: ${ASSET_COUNT:-unknown}"
 
 echo "==> [4/5] dg list components"

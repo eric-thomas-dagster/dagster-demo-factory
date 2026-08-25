@@ -24,90 +24,103 @@ re-verify. Hard cap ~100 lines.
 
 ## Deployment packaging — check before deploying
 
-`./scripts/preflight_deploy.sh <slug>` checks all of these in ~20s. Use it
-instead of discovering them one deploy cycle at a time.
+`./scripts/preflight_deploy.sh <slug>` checks all of these in ~20s.
 
-- `pex` must be installed, or `--build-method local` fails immediately.
-- `dagster-cloud` must be a project dependency, not just a CLI on PATH.
-- `--package-name` must be the module holding `Definitions`, not the project
-  directory name. Verify with `python -c "import <pkg>"`.
-- `dbt_project/` must live **inside** the Python package dir or it won't ship in
-  the wheel; the location then fails to load with a confusing path error.
-- `.gitignore`d files don't ship. dbt `target/manifest.json` and defs-state are
-  usually gitignored — force-include via `[tool.hatch.build.targets.wheel]`.
-- Run `dg utils refresh-defs-state` before deploying when using state-backed
-  components (Fivetran, dbt), or the location fails to load remotely.
-- Verify wheel *contents*, don't trust config: `python -m build` then
-  `unzip -l dist/*.whl | grep -E "manifest|defs_state"`.
-- `deploy_demo.sh` must activate the project venv first, or deploy dies with
-  `dagster-cloud: command not found` after validation passed.
-
-## Deployment — timing and confirmation
-
-- Agent sync after PEX upload routinely takes several minutes. Normal, not a
-  hang. Use a blocking wait on the background task; don't poll tightly.
-- Exit code 0 from deploy does **not** mean the location loaded. Confirm with
-  `dg api` and look for `LOADED`.
-- `LOADED` means the definitions parsed. It does **not** mean assets
-  materialize in the cloud.
-- Prefer `deploy-python-executable --build-method local` (PEX). Docker is
-  available in the sandbox, so `serverless deploy` is a real fallback for
-  source-only deps.
+- `pex` installed and `dagster-cloud` a project dependency (not just a CLI on
+  PATH), or `--build-method local` fails.
+- `--package-name` is the module holding `Definitions`, not the project dir
+  name — verify with `python -c "import <pkg>"`.
+- `dbt_project/` must live **inside** the Python package dir, and dbt
+  `target/manifest.json` / defs-state must be force-included in
+  `[tool.hatch.build.targets.wheel]` — both are normally gitignored, and
+  gitignored files don't ship. Verify with `unzip -l dist/*.whl`, don't trust
+  config.
+- Run `dg utils refresh-defs-state` before deploying state-backed components
+  (dbt, Fivetran), or the location fails to load remotely.
+- Activate the project venv before `dagster-cloud` deploy commands, or it's
+  "command not found" after validation already passed.
+- Agent sync after PEX upload routinely takes several minutes — normal, not a
+  hang; use a blocking wait, don't poll tightly. Exit code 0 does **not** mean
+  the location loaded — confirm with `dg api`, look for `LOADED` (which itself
+  only means definitions parsed, not that assets materialize in the cloud).
+- Prefer `deploy-python-executable --build-method local` (PEX); `serverless
+  deploy` (Docker) is a real fallback for source-only deps.
 
 ## Dagster+ Serverless runtime
 
-- Storage is **ephemeral** — each run is a fresh container; local DuckDB files
-  don't persist between runs. Anything spanning multiple runs works locally and
-  silently breaks in Serverless. Give interactive demos via `dg dev`; treat the
-  Dagster+ deployment as proof the project loads.
+- Storage is **ephemeral** — local DuckDB files don't persist between runs.
+  Give interactive demos via `dg dev`; treat the Dagster+ deployment as proof
+  the project loads, not a place to run multi-run sequences.
 
-## CLI
+## CLI (dagster-dg-cli 1.13.19)
 
-- **Use `dg`, never the legacy `dagster` CLI.** `dg dev` not `dagster dev`;
-  `dg launch --assets '*'` not `dagster asset materialize --select '*'`. The
-  flag differs too: `--assets` vs `--select`. (dagster-dg-cli 1.13.19)
-- `dg launch` options: `--assets`, `--job`, `--partition`,
-  `--partition-range <start>...<end>`, `--config` / `--config-json`.
-- **`dg launch --assets '*'` cannot validate a partitioned project** — it exits
-  with "Asset has partitions, but no '--partition' option was provided". Every
-  build must ship `validate_e2e.py`; `scripts/validate_demo.sh` calls it.
-- `Definitions.resolve_implicit_job_def_def_for_assets(asset_keys)` is the real
-  method name — the doubled `def_def` is not a typo. Delegates to
-  `get_repository_def().get_implicit_job_def_for_assets()`. (dagster, verified
-  2026-08-24)
-- `dagster-component init` does **not** scaffold a project — it writes AI-tool
-  config and wires the `registry_modules` entry point into an existing one. Run
-  `create-dagster project` first.
-- Pass `--auto-install` to `dagster-component init` / `add`, or they prompt and
-  hang forever unattended.
-- The `dagster-community-components-cli` README is stale; the package also has
-  `init`, `sync-deps`, `analyze-schedules`. Check `--help`. (0.8.15)
+- **Use `dg`, never legacy `dagster`.** `dg dev`, `dg launch --assets '*'`
+  (not `--select`), `dg check defs`/`yaml`, `dg list defs`/`components`.
+- `dg launch --assets '*'` **cannot validate a partitioned project** — exits
+  with "Asset has partitions, but no '--partition' option was provided".
+  Every build ships `validate_e2e.py` (`scripts/validate_demo.sh` calls it).
+- `Definitions.resolve_implicit_job_def_def_for_assets(asset_keys)` — the
+  doubled `def_def` is the real method name, not a typo.
+- `dagster-component init` does **not** scaffold a project — run
+  `create-dagster project` first, then `init --auto-install --force` to wire
+  the registry. Missing `--auto-install` on `init`/`add` hangs unattended.
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
+- `dg list defs --json` emits `"asset_key"` (snake_case), not `"assetKey"` —
+  fixed in `scripts/validate_demo.sh`, which was silently reporting "0 assets
+  discovered" on every run.
 
-## APIs and schemas
+## APIs and schemas (dagster-dbt 0.29.19)
 
-- dbt asset `kinds` derive from the manifest's `adapter_type`, so DuckDB badges
-  every model `duckdb`. No `get_kinds` hook — subclass `DagsterDbtTranslator`,
-  override `get_asset_spec(self, manifest, unique_id, project) -> dg.AssetSpec`,
-  and `spec.replace_attributes(kinds={"dbt", "snowflake"})`. (dagster-dbt,
-  verified 2026-08-24)
-- Assets and `AssetSpec`s accept `kinds={"snowflake"}` directly. Max 3 per asset.
+- dbt asset `kinds` derive from the manifest's `adapter_type` (DuckDB badges
+  everything `duckdb`). No `get_kinds` hook — subclass `DagsterDbtTranslator`
+  (or `DbtProjectComponent`), override
+  `get_asset_spec(self, manifest, unique_id, project)`, and
+  `spec.replace_attributes(kinds={"dbt", "<real-warehouse>"})`.
+- dbt asset keys are `<custom-schema>/<model_name>` (e.g. `staging/foo`), not
+  a flat model-name key.
 - `components/__init__.py` must re-export each component class, or the UI
   Components tab won't list them even when `dg list components` does.
+- Multiple `DbtProjectComponent` instances on the same `project_dir`
+  (different `select`s) trigger `DuplicateDefsStateKeyWarning` — the base
+  class keys defs state by project dir alone. Override the `defs_state_config`
+  **property** (not a method — the warning text names the wrong symbol) and
+  fold `self.op.name` into the key.
+
+## Component-authoring gotchas
+
+- Two `@dg.multi_asset(specs=[spec])` functions with the **same Python
+  function name**, built from two instances of one factory component, collide
+  in op registration — a confusing "op X does not have input Y" error mixing
+  up deps between instances. Pass an explicit unique `name=` to `multi_asset`.
+- `oracle_resource` / `postgres_resource` (registry `resource` category) fit
+  the "resource seam" demo-mode pattern well — plain `get_connection()`
+  returning a raw driver connection, all-required fields. Subclass, add
+  demo-safe defaults on every field, override `get_connection()` as a
+  `@contextmanager` yielding a duckdb connection in demo mode.
+- `JobDefinition.execute_in_process()` has no `asset_check_selection` kwarg;
+  checks on selected assets just run automatically. To prove a check catches
+  bad data, mutate its real data source and rematerialize the checked asset.
+- DuckDB: a schema you create yourself (`CREATE SCHEMA raw`) is queried as
+  plain `raw.table`. Only dbt-duckdb's own schemas get a `main_<schema>`
+  prefix (its `generate_schema_name` macro), e.g. `main_staging.foo`. Don't
+  assume `main_` outside dbt-created schemas.
+- `pd.DataFrame([])` (empty list of dicts) has zero columns and breaks a
+  DuckDB insert into a table with an existing schema. A generator that can
+  return zero rows must build via `pd.DataFrame(rows, columns=[...])`.
+
+## Registry gaps (searched, ruled out for partitioned demo-mode ingestion)
+
+- `database_replication` (Sling-backed): no `partitions_def` support; its I/O
+  seam is `SlingResource.replicate()` against a real connection string, not
+  fakeable without a live source+target DB.
+- `rest_api_fetcher` / `odata_ingestion`: need a live endpoint at materialize
+  time, no demo-mode seam.
 
 ## Project config
 
 - `profiles.yml` needs a **working default path** with the env var as an
   optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
-  Requiring it with no fallback ships a demo that won't start.
-
-## Build sequencing that works
-
-- Smoke-test one partition of the first ingestion asset, and inspect the table,
-  before building anything else.
-- Run `dg check defs` after each layer (ingestion → SaaS → dbt), not once at the
-  end. Failures localize instead of compounding.
 
 ## Environment
 
@@ -118,10 +131,3 @@ instead of discovering them one deploy cycle at a time.
 - Cloud env vars are **not** visible to the setup script — session shell only.
 - Briefs and `state/ledger.json` must live on `main`; anything on an unmerged
   branch is invisible to Factory and the run silently no-ops.
-
-## Dead ends
-
-- **Never model recovery as an action inside Dagster.** No heal asset, no heal
-  job, no reset object. Assets are idempotent — model late data as source
-  arrival timing in the mock so a plain rematerialize is the whole story. A
-  disconnected `healed_partitions` node reads as scaffolding.
