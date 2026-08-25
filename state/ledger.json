@@ -1,15 +1,19 @@
 {
-  "brief-ready": [
+  "brief-ready": [],
+  "built": [
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-25-stellantis-financial-services.md",
-      "timestamp": "2026-08-25T13:47:36Z"
-    }
-  ],
-  "built": [
+      "timestamp": "2026-08-25T13:47:36Z",
+      "deployed_at": "2026-08-25T14:35:30Z",
+      "location_name": "demo-stellantis-financial-services",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/6",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-stellantis-financial-services"
+    },
     {
       "company": "ISO New England",
       "slug": "iso-new-england",

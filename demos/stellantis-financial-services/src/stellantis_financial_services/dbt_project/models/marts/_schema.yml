@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: fact_loan_portfolio
+    description: "One row per active loan or lease contract, with dealer and borrower context."
+    columns:
+      - name: contract_id
+        data_tests: [unique, not_null]
+
+  - name: fact_delinquency_snapshot
+    description: "Daily delinquency rollup. Freshness-policed -- SFS's collections team's answer to 'how would we know something broke.'"
+    columns:
+      - name: snapshot_date
+        data_tests: [unique, not_null]
+
+  - name: abs_pool_eligibility
+    description: "Which contracts are eligible for the 2026 ABS securitization pool. Freshness-policed and gated by a blocking completeness check."
+    columns:
+      - name: contract_id
+        data_tests: [unique, not_null]
+      - name: pool_eligible
+        data_tests: [not_null]
+
+  - name: gl_reconciliation_summary
+    description: "Daily tie-out between servicer collections and the GL posting."
+    columns:
+      - name: gl_date
+        data_tests: [unique, not_null]
+
+  - name: customer_360
+    description: "One row per borrower: exposure across every contract."
+    columns:
+      - name: borrower_id
+        data_tests: [unique, not_null]

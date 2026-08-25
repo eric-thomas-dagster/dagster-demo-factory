@@ -1,0 +1,28 @@
+name: "stellantis_financial_services"
+version: "1.0.0"
+config-version: 2
+
+profile: "stellantis_financial_services"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # Wide bound rather than a fixed demo-window end: bronze ingestion is on an
+  # open-ended DailyPartitionsDefinition (see components/partitions.py), so
+  # these models (small full-refresh transforms over the whole staged
+  # window, not incremental builds scoped to one partition) keep working
+  # for whatever day the demo is actually run on. Dagster's partition
+  # bookkeeping per model is independent of dbt's own execution granularity
+  # here -- the same pattern used by the ISO New England build.
+  min_date: "2026-08-01"
+  max_date: "2026-12-31"
+
+models:
+  stellantis_financial_services:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
