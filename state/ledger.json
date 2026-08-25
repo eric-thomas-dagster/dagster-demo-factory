@@ -1,15 +1,19 @@
 {
-  "brief-ready": [
+  "brief-ready": [],
+  "built": [
     {
       "company": "ISO New England",
       "slug": "iso-new-england",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "2026-08-26",
       "brief_path": "briefs/2026-08-26-iso-new-england.md",
-      "timestamp": "2026-08-24T21:00:00Z"
-    }
-  ],
-  "built": [
+      "timestamp": "2026-08-24T21:00:00Z",
+      "deployed_at": "2026-08-25T07:20:00Z",
+      "location_name": "demo-iso-new-england",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/5",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-iso-new-england"
+    },
     {
       "company": "Northwind Logistics",
       "slug": "northwind-logistics",
