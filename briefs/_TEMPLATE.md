@@ -2,7 +2,7 @@
 company: ""
 slug: ""
 domain: ""
-demo_date: ""
+demo_date: ""        # "TBD" if no meeting is booked yet
 demo_time: ""
 attendees: []          # name — title — email
 ae_doc: ""             # Drive URL, or "none"
@@ -22,7 +22,7 @@ this paragraph — if it's vague, the demo is vague. -->
 
 ## Meeting
 
-- **When:**
+- **When:** <!-- or "not booked yet — AE still working out timing" -->
 - **Who's in the room:** <!-- name, title, and what each one cares about -->
 - **Meeting type:** <!-- first demo / technical deep-dive / POC kickoff / architecture review -->
 
