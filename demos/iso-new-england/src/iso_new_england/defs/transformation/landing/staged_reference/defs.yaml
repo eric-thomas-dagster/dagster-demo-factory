@@ -1,0 +1,16 @@
+type: iso_new_england.components.PostgresLandingComponent
+
+attributes:
+  asset_name: staged_reference
+  source_table: external_feed_raw
+  upstream_asset_key: ["raw", "external_feed_raw"]
+  group_name: landing
+  description: >
+    Operations-advisory events landed in the Postgres landing zone, copied
+    from the external feed extract.
+  landing:
+    demo_mode: true
+    host: "{{ env('ISO_NE_POSTGRES_HOST', 'localhost') }}"
+    database: "{{ env('ISO_NE_POSTGRES_DATABASE', 'iso_ne_demo') }}"
+    username: "{{ env('ISO_NE_POSTGRES_USER', 'demo_user') }}"
+    password: "{{ env.ISO_NE_POSTGRES_PASSWORD }}"

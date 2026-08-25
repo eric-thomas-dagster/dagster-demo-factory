@@ -1,0 +1,11 @@
+type: iso_new_england.components.ExternalFeedComponent
+
+attributes:
+  demo_mode: true
+  demo_seed: 20260826
+  landing:
+    demo_mode: true
+    host: "{{ env('ISO_NE_POSTGRES_HOST', 'localhost') }}"
+    database: "{{ env('ISO_NE_POSTGRES_DATABASE', 'iso_ne_demo') }}"
+    username: "{{ env('ISO_NE_POSTGRES_USER', 'demo_user') }}"
+    password: "{{ env.ISO_NE_POSTGRES_PASSWORD }}"

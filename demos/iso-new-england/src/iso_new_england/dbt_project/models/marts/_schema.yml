@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: mart_daily_operations_summary
+    description: "One row per day: reporting-point count, interval volume, average/peak load, and advisory count."
+    columns:
+      - name: event_date
+        data_tests: [unique, not_null]
+
+  - name: mart_source_reliability
+    description: "Per-reporting-point reliability over the window: days reporting and estimated-quality rate."
+
+  - name: mart_capacity_trend
+    description: "Daily peak load alongside a trailing 3-day average."
+
+  - name: platform_status_report
+    description: >
+      The user-facing platform status view -- one row per day, with a plain-
+      language `platform_status` (nominal / advisory_active / degraded_quality).
+      This is the direct answer to "how would we know something broke."
+    columns:
+      - name: event_date
+        data_tests: [unique, not_null]
+      - name: platform_status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["nominal", "advisory_active", "degraded_quality"]

@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: staged
+    schema: staged
+    tables:
+      - name: staged_readings
+        meta:
+          dagster:
+            asset_key: ["staged", "staged_readings"]
+      - name: staged_reference
+        meta:
+          dagster:
+            asset_key: ["staged", "staged_reference"]

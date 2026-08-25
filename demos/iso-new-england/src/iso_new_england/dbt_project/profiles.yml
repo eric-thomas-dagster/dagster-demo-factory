@@ -1,0 +1,20 @@
+iso_new_england:
+  target: "{{ env_var('ISO_NE_DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # `__init__.py` sets this env var to a working project-relative default
+      # (`demo_data/demo.duckdb`) before Dagster loads any defs, so this
+      # always resolves even with zero manual setup. Override it to point
+      # dbt at a different DuckDB file without touching this profile.
+      path: "{{ env_var('ISO_NE_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    live:
+      type: postgres
+      host: "{{ env_var('ISO_NE_POSTGRES_HOST') }}"
+      port: "{{ env_var('ISO_NE_POSTGRES_PORT', '5432') | as_number }}"
+      user: "{{ env_var('ISO_NE_POSTGRES_USER') }}"
+      password: "{{ env_var('ISO_NE_POSTGRES_PASSWORD') }}"
+      dbname: "{{ env_var('ISO_NE_POSTGRES_DATABASE') }}"
+      schema: "marts"
+      threads: 4

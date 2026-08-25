@@ -1,0 +1,22 @@
+type: iso_new_england.components.IsoNeDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_intermediate
+  select: "int_readings_validated int_daily_rollup"
+  translation:
+    group_name: intermediate
+    partitions_def: "{{ dg.DailyPartitionsDefinition(start_date='2026-08-11', timezone='America/New_York') }}"
+
+post_processing:
+  assets:
+    - target: "intermediate/int_readings_validated"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "intermediate/int_daily_rollup"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"

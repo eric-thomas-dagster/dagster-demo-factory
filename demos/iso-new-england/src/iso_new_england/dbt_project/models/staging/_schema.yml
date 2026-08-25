@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: stg_readings
+    description: "Typed interval telemetry from the Postgres landing zone, one row per reporting point per hour."
+    columns:
+      - name: reporting_point_id
+        data_tests: [not_null]
+      - name: reading_mw
+        data_tests: [not_null]
+
+  - name: stg_reference
+    description: "Typed operations-advisory events from the Postgres landing zone."
+    columns:
+      - name: notice_id
+        data_tests: [unique, not_null]
+      - name: category
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["capacity_alert", "transmission_notice", "market_notice", "weather_advisory"]
