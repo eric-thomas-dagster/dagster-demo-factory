@@ -1,0 +1,187 @@
+# One DemoFabricWorkspaceComponent instance covers the whole vendor-file ->
+# bronze -> silver -> gold -> Power BI Fabric pipeline estate -- 17 assets,
+# one explicit mapping table. Adding SFS's 700th migrated SSIS package is
+# one more entry here, not a new component instance or Python file (the
+# CLAUDE.md scaling test).
+#
+# workspace_id is a placeholder demo GUID -- never gates startup. tenant_id/
+# client_id/client_secret are optional and only read when demo_mode: false.
+type: stellantis_financial_services.components.fabric_workspace_demo.DemoFabricWorkspaceComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  workspace:
+    workspace_id: "8f2c6b10-4a3e-4d1c-9b7a-2e5f6c8a1d90"
+    tenant_id: "{{ env.AZURE_TENANT_ID }}"
+    client_id: "{{ env.AZURE_CLIENT_ID }}"
+    client_secret: "{{ env.AZURE_CLIENT_SECRET }}"
+  demo_mode: true
+  demo_seed: 20260826
+  group_name: fabric
+
+  assets_by_item_name:
+    # --- Bronze: vendor file ingestion -------------------------------------
+    raw_loan_originations:
+      key: raw_loan_originations
+      partitions: daily
+      group_name: bronze
+      kinds: [fabric, azure]
+      description: "Daily loan origination file from the dealer/servicer feed, triggered as a Fabric Data Pipeline."
+    raw_lease_originations:
+      key: raw_lease_originations
+      partitions: daily
+      group_name: bronze
+      kinds: [fabric, azure]
+      description: "Daily lease origination file from the dealer/servicer feed, triggered as a Fabric Data Pipeline."
+    raw_payment_transactions:
+      key: raw_payment_transactions
+      partitions: daily
+      group_name: bronze
+      kinds: [fabric, azure]
+      description: "Daily loan and lease payment transaction batch, triggered as a Fabric Data Pipeline."
+    raw_dealer_floorplan_feed:
+      key: raw_dealer_floorplan_feed
+      partitions: daily_dealer_group
+      group_name: bronze
+      kinds: [fabric, azure]
+      description: "Per-region dealer floorplan financing feed -- the one bronze asset with a genuine dealer_group partition dimension."
+    raw_credit_bureau_pull:
+      key: raw_credit_bureau_pull
+      deps: [raw_loan_originations, raw_lease_originations]
+      partitions: daily
+      group_name: bronze
+      kinds: [fabric, azure]
+      description: "Commercial credit bureau pull for the day's loan and lease applicants, triggered as a Fabric Data Pipeline."
+
+    # --- Silver: conforming/staging (existing SSIS/stored-proc logic, now
+    # running as Fabric pipelines) ------------------------------------------
+    stg_loan_originations:
+      key: stg_loan_originations
+      deps: [raw_loan_originations]
+      partitions: daily
+      group_name: silver
+      kinds: [fabric]
+      description: "Conformed loan originations -- the Fabric pipeline that used to be an SSIS package in the legacy SQL Server estate."
+    stg_lease_originations:
+      key: stg_lease_originations
+      deps: [raw_lease_originations]
+      partitions: daily
+      group_name: silver
+      kinds: [fabric]
+      description: "Conformed lease originations, migrated from an SSIS package into a Fabric pipeline."
+    stg_payment_transactions:
+      key: stg_payment_transactions
+      deps: [raw_payment_transactions]
+      partitions: daily
+      group_name: silver
+      kinds: [fabric]
+      description: "Deduplicated payment transactions, migrated from an SSIS package into a Fabric pipeline."
+    stg_delinquency_events:
+      key: stg_delinquency_events
+      deps: [stg_payment_transactions]
+      partitions: daily
+      group_name: silver
+      kinds: [fabric]
+      description: "Delinquency events derived from payment lateness -- the signal `fact_delinquency_snapshot` pages someone over."
+    dim_dealer:
+      key: dim_dealer
+      cross_partition_deps: [raw_dealer_floorplan_feed]
+      partitions: daily
+      group_name: silver
+      kinds: [fabric]
+      description: "Dealer dimension rolling up all 4 dealer_group partitions of the floorplan feed for one date."
+    dim_borrower:
+      key: dim_borrower
+      deps: [raw_loan_originations, raw_lease_originations, raw_credit_bureau_pull]
+      partitions: daily
+      group_name: silver
+      kinds: [fabric]
+      description: "Borrower dimension combining origination and bureau data for the day's applicants."
+
+    # --- Gold: marts, directly tied to the 2026 ABS securitization calendar
+    fact_loan_portfolio:
+      key: fact_loan_portfolio
+      deps: [stg_loan_originations, dim_dealer, dim_borrower]
+      partitions: daily
+      group_name: gold
+      kinds: [fabric, azure]
+      description: "The funded loan portfolio for the day, joined to dealer and borrower dimensions."
+    fact_delinquency_snapshot:
+      key: fact_delinquency_snapshot
+      deps: [stg_delinquency_events, dim_borrower]
+      partitions: daily
+      group_name: gold
+      kinds: [fabric, azure]
+      description: "Daily delinquency rate snapshot -- the asset someone gets paged over."
+    abs_pool_eligibility:
+      key: abs_pool_eligibility
+      deps: [fact_loan_portfolio, fact_delinquency_snapshot]
+      partitions: daily
+      group_name: gold
+      kinds: [fabric, azure]
+      description: "Per-loan ABS securitization pool eligibility -- the money-shot terminal asset for SFS's 2026 ABS calendar."
+    gl_reconciliation_summary:
+      key: gl_reconciliation_summary
+      deps: [stg_payment_transactions, fact_loan_portfolio]
+      partitions: daily
+      group_name: gold
+      kinds: [fabric, azure]
+      description: "Daily GL reconciliation between payments received and portfolio originations."
+    customer_360:
+      key: customer_360
+      deps: [dim_borrower, fact_loan_portfolio, fact_delinquency_snapshot]
+      partitions: daily
+      group_name: gold
+      kinds: [fabric, azure]
+      description: "Borrower-level 360 view, echoing the Customer Data Platform team's own framing."
+
+    # --- Reporting -----------------------------------------------------------
+    powerbi_portfolio_dashboard_refresh:
+      key: powerbi_portfolio_dashboard_refresh
+      deps: [abs_pool_eligibility, customer_360, gl_reconciliation_summary]
+      partitions: daily
+      group_name: reporting
+      kinds: [powerbi, fabric]
+      description: "Refreshes the exec-facing Power BI portfolio dashboard once the gold layer is ready for the day."
+
+post_processing:
+  assets:
+    - target: "stg_loan_originations"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "stg_lease_originations"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "stg_payment_transactions"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "stg_delinquency_events"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "dim_dealer"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "dim_borrower"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "fact_loan_portfolio"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "fact_delinquency_snapshot"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+        freshness_policy: "{{ delinquency_snapshot_freshness }}"
+    - target: "abs_pool_eligibility"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+        freshness_policy: "{{ abs_pool_freshness }}"
+    - target: "gl_reconciliation_summary"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "customer_360"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
+    - target: "powerbi_portfolio_dashboard_refresh"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream }}"
