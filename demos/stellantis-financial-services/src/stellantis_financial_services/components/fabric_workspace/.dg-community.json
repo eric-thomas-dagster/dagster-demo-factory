@@ -1,0 +1,9 @@
+{
+  "id": "fabric_workspace",
+  "name": "Microsoft Fabric Workspace",
+  "category": "integration",
+  "ref": "main",
+  "version": "1.0.0",
+  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/integrations/fabric_workspace/component.py",
+  "installed_at": "2026-08-26T16:27:47+00:00"
+}

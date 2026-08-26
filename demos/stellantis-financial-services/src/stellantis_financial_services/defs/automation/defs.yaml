@@ -1,0 +1,28 @@
+# The overnight vendor-file cutoff -- the one fixed-time trigger in this
+# demo. Loan, lease, payment, and credit-bureau batches land overnight from
+# their source systems; this schedule is the deadline every downstream
+# silver/gold asset's eager automation condition (defs/fabric_pipelines/
+# defs.yaml) reacts to once it fires. `raw_dealer_floorplan_feed` isn't
+# included -- it's the one multi-partitioned (date x dealer_group) bronze
+# asset, and cron_schedule's partitioned-job path only supports a single
+# time axis; it's triggered ad hoc / via backfill in this demo instead,
+# which is also the money-shot live-rematerialization asset.
+#
+# partition_start must equal DAILY_PARTITIONS_DEF's start_date in
+# components/partitions.py (both default to UTC) -- this component builds
+# its own partitions_def internally and passes it to define_asset_job,
+# which errors if it doesn't equal the selected assets' own partitions_def.
+type: stellantis_financial_services.components.cron_schedule.component.CronScheduleComponent
+attributes:
+  schedule_name: overnight_vendor_file_schedule
+  asset_keys:
+    - raw_loan_originations
+    - raw_lease_originations
+    - raw_payment_transactions
+    - raw_credit_bureau_pull
+  partition_type: daily
+  partition_start: "2026-08-01"
+  execution_timezone: UTC
+  default_status: STOPPED
+  tags:
+    team: enterprise-data-management
