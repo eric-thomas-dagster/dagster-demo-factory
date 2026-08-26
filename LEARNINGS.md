@@ -22,35 +22,49 @@ re-verify. Hard cap ~100 lines.
 
 ---
 
-## Deployment
+## Deployment packaging — check before deploying
 
-`./scripts/preflight_deploy.sh <slug> [pkg]` checks packaging in ~20s — use
-it instead of discovering these one deploy cycle at a time. `pkg` defaults
-to `slug`; pass it explicitly when the module name uses underscores where
-the slug uses hyphens, or preflight fails on step 3 for the wrong reason.
+`./scripts/preflight_deploy.sh <slug>` checks all of these in ~20s. Use it
+instead of discovering them one deploy cycle at a time.
 
-- `pex` installed, `dagster-cloud` a real `pyproject.toml` dependency (not
-  just a CLI on PATH), `--package-name` the module holding `Definitions`
-  (verify with `python -c "import <pkg>"`).
-- `.gitignore`d files don't ship (dbt `target/manifest.json`, defs-state) —
-  force-include via `[tool.hatch.build.targets.wheel]`. `dbt_project/` must
-  live inside the package dir. Run `dg utils refresh-defs-state` before
-  deploying any state-backed component (Fivetran, dbt).
-- `deploy_demo.sh` must activate the project venv first, or it dies with
+- `pex` must be installed, or `--build-method local` fails immediately.
+- `dagster-cloud` must be a project dependency, not just a CLI on PATH.
+- `--package-name` must be the module holding `Definitions`, not the project
+  directory name. Verify with `python -c "import <pkg>"`.
+- `dbt_project/` must live **inside** the Python package dir or it won't ship in
+  the wheel; the location then fails to load with a confusing path error.
+- `.gitignore`d files don't ship. dbt `target/manifest.json` and defs-state are
+  usually gitignored — force-include via `[tool.hatch.build.targets.wheel]`.
+- Run `dg utils refresh-defs-state` before deploying when using state-backed
+  components (Fivetran, dbt), or the location fails to load remotely.
+- Verify wheel *contents*, don't trust config: `python -m build` then
+  `unzip -l dist/*.whl | grep -E "manifest|defs_state"`.
+- `deploy_demo.sh` must activate the project venv first, or deploy dies with
   `dagster-cloud: command not found` after validation passed.
-- Agent sync after PEX upload takes several minutes — normal, use a blocking
-  wait, don't poll tightly. Exit code 0 does **not** mean the location
-  loaded — confirm with `dg api`, look for `LOADED` (which itself only means
-  definitions parsed, not that assets materialize).
-- Prefer `deploy-python-executable --build-method local` (PEX);
-  `serverless deploy` (Docker) is the fallback for source-only deps.
-- Dagster+ Serverless storage is **ephemeral** — each run is a fresh
-  container, so local DuckDB files don't persist between runs there. Give
-  interactive demos via `dg dev`; treat the Dagster+ deployment as proof the
-  project loads, not a place to run multi-run sequences.
+
+## Deployment — timing and confirmation
+
+- Agent sync after PEX upload routinely takes several minutes. Normal, not a
+  hang. Use a blocking wait on the background task; don't poll tightly.
+- Exit code 0 from deploy does **not** mean the location loaded. Confirm with
+  `dg api` and look for `LOADED`.
+- `LOADED` means the definitions parsed. It does **not** mean assets
+  materialize in the cloud.
+
+## Dagster+ Serverless runtime
+
+- Storage is **ephemeral** — each run is a fresh container; local DuckDB files
+  don't persist between runs. Anything spanning multiple runs works locally and
+  silently breaks in Serverless. Give interactive demos via `dg dev`; treat the
+  Dagster+ deployment as proof the project loads.
 
 ## CLI
 
+- **Use `dg`, never the legacy `dagster` CLI.** `dg dev` not `dagster dev`;
+  `dg launch --assets '*'` not `dagster asset materialize --select '*'`. The
+  flag differs too: `--assets` vs `--select`. (dagster-dg-cli 1.13.19)
+- `dg launch` options: `--assets`, `--job`, `--partition`,
+  `--partition-range <start>...<end>`, `--config` / `--config-json`.
 - **`dg launch --assets '*'` cannot validate a partitioned project** — it exits
   with "Asset has partitions, but no '--partition' option was provided". Every
   build must ship `validate_e2e.py`; `scripts/validate_demo.sh` calls it.
@@ -60,14 +74,17 @@ the slug uses hyphens, or preflight fails on step 3 for the wrong reason.
   2026-08-24)
 - `dagster-component init` does **not** scaffold a project — it writes AI-tool
   config and wires the `registry_modules` entry point into an existing one. Run
-  `create-dagster project` first, then `init --auto-install --force` (or it
-  prompts and hangs forever unattended).
-- `dagster-component search` takes **one QUERY string**, not multiple CLI
-  args — put every term inside that one string for AND matching:
-  `dagster-component search "sql server ssis" --json`. Separate args
-  (`search "sql server" ssis`) errors "Got unexpected extra arguments".
-  (dagster-community-components-cli, corrected 2026-08-26 — an earlier
-  entry here had this backwards)
+  `create-dagster project` first.
+- Pass `--auto-install` to `dagster-component init` / `add`, or they prompt and
+  hang forever unattended.
+- The `dagster-community-components-cli` README is stale; the package also has
+  `init`, `sync-deps`, `analyze-schedules`. Check `--help`. (0.8.15)
+- `dagster-component search` takes **one positional argument**. Multiple
+  positional terms are rejected. Put several terms *inside* one quoted string —
+  they're AND-ed across id, name, description, tags, keywords, agent_hints:
+  `dagster-component search "fabric pipeline asset" --json`. `--json` returns
+  `{id, score, matched_fields, matched_terms, category, produces, description}`.
+  (verified 2026-08-26)
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
 
@@ -81,19 +98,17 @@ the slug uses hyphens, or preflight fails on step 3 for the wrong reason.
 - Assets and `AssetSpec`s accept `kinds={"snowflake"}` directly. Max 3 per asset.
 - `components/__init__.py` must re-export each component class, or the UI
   Components tab won't list them even when `dg list components` does.
-- `dg.AssetCheckExecutionContext` exposes `has_partition_key`/`partition_key`
-  (not `has_asset_partitions`) — same attribute names as
-  `AssetExecutionContext`. (dagster 1.13.19)
-- `dg.build_schedule_from_partitioned_job` **rejects `cron_schedule`/
-  `execution_timezone` for a time-partitioned job** (a plain
-  `DailyPartitionsDefinition` job, or a `MultiPartitionsDefinition` job with
-  one time dimension) — pass `hour_of_day`/`minute_of_hour` instead; the
-  timezone comes from the `partitions_def` itself. (dagster 1.13.19)
-- A registry component's `add`-time `uv pip install` isn't recorded in
-  `pyproject.toml` — a later plain `uv sync` silently **uninstalls** those
-  packages. Add real runtime deps it needs (e.g. `azure-identity`,
-  `requests` for a Fabric/Azure component) to `pyproject.toml`
-  `dependencies` yourself, not just via the CLI's auto-install.
+
+## Project config
+
+- `profiles.yml` needs a **working default path** with the env var as an
+  optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
+  Requiring it with no fallback ships a demo that won't start.
+
+## Build sequencing that works
+
+- Run `dg check defs` after each layer (ingestion → SaaS → dbt), not once at the
+  end. Failures localize instead of compounding.
 
 ## Environment
 
@@ -105,16 +120,40 @@ the slug uses hyphens, or preflight fails on step 3 for the wrong reason.
 - Briefs and `state/ledger.json` must live on `main`; anything on an unmerged
   branch is invisible to Factory and the run silently no-ops.
 
-## Registry coverage worth knowing
+## Registry components that already exist (search before writing)
 
-- Microsoft Fabric: `fabric_workspace` (imports items from a *live* workspace
-  as unpartitioned assets), `fabric_pipeline_trigger_job` (bare job+schedule,
-  not an asset), `fabric_workspace_resource` (REST client:
-  `list_items`/`trigger_item_run`/`wait_for_run`), `fabric_lakehouse_resource`,
-  `fabric_lakehouse_io_manager`, `dataframe_to_fabric_lakehouse`,
-  `fabric_capacity_admin_job`. Plus ~66 Azure and ~18 Databricks components.
-  **None of these produce a named/partitioned/checked asset** for a
-  trigger-and-observe demo — wire `fabric_workspace_resource` as a resource
-  and write one custom asset-producing component around it (still rung 2:
-  registry resource, as-is; the asset component itself is rung 4 — write a
-  `component-feedback/` entry). (re-verified 2026-08-26)
+- Scheduling/automation: `cron_schedule` ("run an asset selection on a cron
+  schedule"), `interval_schedule`, `automation_condition_applicator`,
+  `per_partition_backfill_job`. **A previous run wrote a custom cron-schedule
+  component claiming "nothing to search the registry for" — it exists.** Never
+  assert a gap without running the search. (2026-08-26)
+- Microsoft Fabric: `fabric_workspace`, `fabric_pipeline_trigger_job`,
+  `fabric_lakehouse_resource`, `fabric_lakehouse_io_manager`,
+  `dataframe_to_fabric_lakehouse`, `fabric_capacity_admin_job`. Plus ~66 Azure,
+  ~18 Databricks, and `azure_synapse` / `synapse_sql_pool_admin_job`.
+  (2026-08-25)
+- Use the **workspace-style** component with an explicit mapping table in
+  `defs.yaml`, not one instance per external object. Reference:
+  `github.com/eric-thomas-dagster/databricks-workspace-bundles-demo`
+  (`assets_by_task_key` in `defs/workspace_us/defs.yaml`). (2026-08-26)
+- `fabric_workspace` discovering items from a live connection is **not** a
+  reason to reject it — subclass and mock the discovery in demo mode, and add
+  an explicit `assets_by_item_name`-style mapping, exactly as the Databricks
+  demo does. A 2026-08-26 run rejected it on those grounds and wrote a custom
+  component instead, skipping the subclass rung. (2026-08-26)
+
+## Don't rebuild platform features
+
+- Dagster+ has **native alert policies** for Slack, Teams, email, and
+  PagerDuty, covering run failures, asset check failures, freshness violations,
+  and schedule/sensor failures. Never hand-roll alerting in a demo — it implies
+  the platform lacks something it has. Show it in the UI instead. (2026-08-25)
+
+## Dead ends
+
+- **Never plant a failure in a demo.** No anomalies, corrupt partitions, or
+  missing data — not behind a flag. A demo that can fail will fail live, on the
+  path nobody rehearsed. Build the checks and explain what they'd catch in
+  production, against a green graph. Corollary: nothing to heal, so no heal
+  asset, heal job, or reset object; a disconnected `healed_partitions` node
+  reads as scaffolding. Briefs cannot override this. (2026-08-25)

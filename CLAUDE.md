@@ -296,6 +296,69 @@ The line is *"Dagster orchestrates what you have today and what you're moving to
 during the migration, with one lineage graph across both."* That's a much harder
 thing for a competitor to answer than a demo of the destination alone.
 
+## One component instance, many objects — never one-per-object
+
+**The scaling test: adding the prospect's 30th pipeline should be one more line
+of YAML, not one more component instance or Python file.** If it isn't, the demo
+argues against us — it says Dagster needs bespoke wiring per object, which is
+exactly what they're trying to escape.
+
+Reach for **workspace / collection components** that discover or enumerate many
+external objects under a single instance, with an explicit mapping table in
+`defs.yaml` binding each object to an asset spec. In the Databricks case that's
+`assets_by_task_key`; Fabric, Airflow, and the other workspace-style components
+have their equivalent. One instance, one YAML block, N assets.
+
+**Reference implementation:**
+`github.com/eric-thomas-dagster/databricks-workspace-bundles-demo` — public,
+read it. Note especially how `defs/workspace_us/defs.yaml` maps many task keys
+to asset specs with `key`, `deps`, `owners`, and `description` per entry, and how
+adding a region is additive rather than multiplicative. Copy that shape.
+
+Anti-patterns, all of which mean the build went wrong:
+
+- N component instances for N external pipelines/jobs/notebooks
+- A custom component whose job is "call this one specific pipeline"
+- Per-object Python asset functions wrapping external triggers
+- Any structure where adding an object means editing Python
+
+If the explicit mapping is long, that's fine — a 40-entry `assets_by_task_key`
+block is *good*, because it shows the prospect exactly how their estate maps in.
+
+## Rung 3 is not optional — subclass before you write custom
+
+The most common failure is jumping from "the registry component doesn't fit
+as-is" straight to a custom component, skipping the subclass rung entirely.
+
+**These are NOT reasons to reject a registry component.** Every one is a
+subclass away:
+
+| Objection | Why it isn't disqualifying |
+|---|---|
+| "It discovers items from a live connection" | Demo mode exists to mock exactly that. Subclass, override the discovery/list call, return a fixed item list. Same seam as any other I/O boundary. |
+| "Asset keys come from the source system, not us" | Add an explicit mapping in the subclass — `assets_by_task_key` in the Databricks workspace component is precisely this, and it's the established pattern. |
+| "No partitions support" | Add the partitions config in the subclass and pass it through to the specs it builds. |
+| "No freshness / retry / check surface" | Compose those from outside, or add the config fields in the subclass. |
+| "It's a job, not an asset" | Ask whether a sibling asset-producing component exists first; if the trigger/poll body is what you want, wrap it rather than rewriting it. |
+
+**Judge a registry component on its domain and its seam, not on its current
+feature completeness.** If it covers the right system and has a method you can
+override, rung 3 is the answer. A custom component is correct only when nothing
+in the registry touches the domain at all, or when the shape is so wrong that a
+subclass would override everything.
+
+The test: *if the registry component gained two config fields, would it work?*
+If yes, subclass it and note the two fields in the feedback file as the
+suggested change. That feedback is worth far more than a bespoke class, because
+it improves the component for everyone.
+
+**Reference:** `github.com/eric-thomas-dagster/databricks-workspace-bundles-demo`
+(public) subclasses the official Databricks workspace and asset-bundle
+components to add a demo-mode seam, explicit `assets_by_task_key` mapping, and
+op-naming fixes — while keeping the parent's behaviour in production. Its
+`README.md` has a table of which subclasses are genuinely required and which
+just add demo mode. That is the shape to copy.
+
 ## When you write a custom component, write feedback
 
 If the escalation ladder falls all the way through to a custom component, the
@@ -317,6 +380,14 @@ Be specific about the *why*. "Didn't fit" is useless; "no way to inject a
 partition key into the request path" is actionable. This file is the input to
 improving the registry, so vague feedback wastes the run's most valuable
 byproduct.
+
+**You may not assert a registry gap you did not search for.** The feedback file
+must contain the literal commands you ran and what they returned. Reasoning like
+"this is core Dagster, so there'd be nothing in the registry" is not permitted —
+the registry has ~975 components including thin wrappers over core Dagster
+calls (`cron_schedule`, `interval_schedule`, `automation_condition_applicator`
+all exist). Search first, every time, with `--json`. If a search you claimed to
+run isn't in the feedback file, the custom component is unjustified.
 
 ## Component escalation ladder
 
