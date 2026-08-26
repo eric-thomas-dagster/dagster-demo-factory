@@ -4,7 +4,7 @@
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
-      "status": "deployed",
+      "status": "brief-ready",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-26-stellantis-financial-services.md",
       "timestamp": "2026-08-26T15:00:00Z",
@@ -12,8 +12,8 @@
       "location_name": "demo-stellantis-financial-services",
       "deployment": "prod",
       "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/9",
-      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-stellantis-financial-services",
-      "note": "All-green rebuild of the orchestrate-existing-workloads brief: 17 assets, all trigger-and-observe wrappers around Fabric pipelines, no planted anomaly. Every partition materializes and every check passes; the replay/recovery story is told via live partition-scoped rematerialization instead of a staged failure."
+      "note": "All-green rebuild of the orchestrate-existing-workloads brief: 17 assets, all trigger-and-observe wrappers around Fabric pipelines, no planted anomaly. Every partition materializes and every check passes; the replay/recovery story is told via live partition-scoped rematerialization instead of a staged failure.",
+      "reset_at": "2026-08-26T12:19:02"
     },
     {
       "company": "Kapitus",
