@@ -1,9 +1,0 @@
-type: stellantis_financial_services.components.FabricPipelineResourceComponent
-
-attributes:
-  resource_key: fabric
-  demo_mode: "{{ env('STELLANTIS_DEMO_MODE', 'true') }}"
-  workspace_id: "{{ env('STELLANTIS_FABRIC_WORKSPACE_ID', '00000000-0000-0000-0000-000000000000') }}"
-  tenant_id_env_var: AZURE_TENANT_ID
-  client_id_env_var: AZURE_CLIENT_ID
-  client_secret_env_var: AZURE_CLIENT_SECRET

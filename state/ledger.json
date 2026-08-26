@@ -4,7 +4,7 @@
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
-      "status": "deployed",
+      "status": "brief-ready",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-26-stellantis-financial-services.md",
       "timestamp": "2026-08-26T00:00:00Z",
@@ -12,8 +12,8 @@
       "location_name": "demo-stellantis-financial-services",
       "deployment": "prod",
       "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/8",
-      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-stellantis-financial-services",
-      "note": "Rebuild of the requeued brief (Fabric trigger-and-observe over SSIS/Fabric pipelines, no dbt) after the 2026-08-25 dbt-based version was deleted and requeued."
+      "note": "Rebuild of the requeued brief (Fabric trigger-and-observe over SSIS/Fabric pipelines, no dbt) after the 2026-08-25 dbt-based version was deleted and requeued.",
+      "reset_at": "2026-08-26T10:47:26"
     },
     {
       "company": "Kapitus",
