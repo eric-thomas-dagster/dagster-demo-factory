@@ -36,8 +36,21 @@ instead of discovering them one deploy cycle at a time.
 
 - `pex` must be installed, or `--build-method local` fails immediately.
 - `dagster-cloud` must be a project dependency, not just a CLI on PATH.
-- `--package-name` must be the module holding `Definitions`, not the project
-  directory name. Verify with `python -c "import <pkg>"`.
+- **Use `--module-name "<pkg>.definitions"` on the actual deploy command, not
+  `--package-name "<pkg>"`.** `CLAUDE.md`'s own documented deploy command uses
+  `--package-name`, but when the project's `<pkg>/__init__.py` doesn't
+  re-export `defs` (true of every demo built so far — Kapitus, ISO NE, and
+  this one all only `os.environ.setdefault(...)` there), the remote grpc
+  server's `loadable_targets_from_python_package` finds nothing and the
+  location fails to load with `No Definitions, RepositoryDefinition, Job,
+  Pipeline, Graph, or AssetsDefinition found in "<pkg>"` — a deploy-command
+  *exit code 0* failure, only caught by the post-deploy LOADED check.
+  `scripts/deploy_demo.sh` already uses `--module-name` and gets this right;
+  a manual deploy command copied from `CLAUDE.md` does not. Use the script,
+  or use `--module-name` directly if deploying by hand. (verified 2026-08-26)
+- `preflight_deploy.sh`'s `--package-name` argument is unrelated to the above
+  — it's only used locally for `python -c "import <pkg>"`, not passed to the
+  deploy command itself.
 - `dbt_project/` must live **inside** the Python package dir or it won't ship in
   the wheel; the location then fails to load with a confusing path error.
 - `.gitignore`d files don't ship. dbt `target/manifest.json` and defs-state are
