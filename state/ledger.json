@@ -7,12 +7,12 @@
       "status": "brief-ready",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-26-stellantis-financial-services.md",
-      "timestamp": "2026-08-26T15:00:00Z",
+      "timestamp": "2026-08-26T19:30:00Z",
       "deployed_at": "2026-08-26T15:19:00Z",
       "location_name": "demo-stellantis-financial-services",
       "deployment": "prod",
       "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/9",
-      "note": "All-green rebuild of the orchestrate-existing-workloads brief: 17 assets, all trigger-and-observe wrappers around Fabric pipelines, no planted anomaly. Every partition materializes and every check passes; the replay/recovery story is told via live partition-scoped rematerialization instead of a staged failure.",
+      "note": "Third rewrite. PR #9's all-green rebuild rejected the registry's fabric_workspace component and wrote a custom FabricPipelineAssetComponent instead, skipping the subclass rung (rung 3) CLAUDE.md now makes mandatory; Eric cleared the brief and project again right after landing that rule. This rewrite keeps the same research and asset graph and rewrites the Build directives' component-strategy section to require subclassing fabric_workspace (mock discovery, explicit assets_by_item_name-style mapping, partitions passthrough) instead of a custom component. deployed_at/location_name/pr_url below describe the now-deleted PR #9 build, kept for history only — the project no longer exists and needs a fresh build.",
       "reset_at": "2026-08-26T12:19:02"
     },
     {
