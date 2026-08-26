@@ -1,0 +1,12 @@
+type: stellantis_financial_services.components.PartitionedIngestionScheduleComponent
+attributes:
+  job_name: dealer_floorplan_feed_job
+  description: >
+    Regional dealer floorplan feeds land on their own cadence, separate
+    from the single-dimension bronze feeds -- a MultiPartitionsDefinition
+    job can't share a schedule with a date-only job.
+  asset_selection:
+    - raw_dealer_floorplan_feed
+  partitions: multi_date_dealer_group
+  hour_of_day: 6
+  minute_of_hour: 30

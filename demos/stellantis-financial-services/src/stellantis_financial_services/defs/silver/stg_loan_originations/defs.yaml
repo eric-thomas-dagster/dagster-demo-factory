@@ -1,0 +1,16 @@
+type: stellantis_financial_services.components.FabricPipelineAssetComponent
+attributes:
+  asset_key: stg_loan_originations
+  generator_key: stg_loan_originations
+  description: >
+    Conformed loan originations -- dealer/vehicle attributes normalized and
+    LTV derived -- produced by the pl_stage_loan_originations Fabric
+    pipeline (the SSIS/stored-proc conforming logic being migrated in).
+  group_name: silver
+  kinds: [fabric, azure]
+  pipeline_name: pl_stage_loan_originations
+  deps: [raw_loan_originations]
+  partitions: daily
+  dollar_metadata_column: amount
+  automation_eager: true
+  fabric_item_name: pl_stage_loan_originations

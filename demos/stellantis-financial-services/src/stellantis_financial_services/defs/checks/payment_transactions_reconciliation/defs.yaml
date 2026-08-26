@@ -1,0 +1,17 @@
+type: stellantis_financial_services.components.DuckDbAssetCheckComponent
+attributes:
+  asset_key: stg_payment_transactions
+  check_name: payment_transactions_reconciliation
+  blocking: false
+  description: >
+    Bronze-to-silver row count matches for the day's payment transactions.
+    Maps to: "UI/visibility is fragmented ... hard to trust outputs" --
+    proves the conforming pipeline didn't silently drop or duplicate rows.
+  sql: >
+    SELECT
+      (
+        (SELECT COUNT(*) FROM bronze.raw_payment_transactions WHERE transaction_date = '{date}')
+        = (SELECT COUNT(*) FROM silver.stg_payment_transactions WHERE transaction_date = '{date}')
+      ) AS passed,
+      (SELECT COUNT(*) FROM bronze.raw_payment_transactions WHERE transaction_date = '{date}') AS bronze_count,
+      (SELECT COUNT(*) FROM silver.stg_payment_transactions WHERE transaction_date = '{date}') AS silver_count

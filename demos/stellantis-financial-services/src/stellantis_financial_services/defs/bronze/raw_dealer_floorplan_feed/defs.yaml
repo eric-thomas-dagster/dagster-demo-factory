@@ -1,0 +1,22 @@
+type: stellantis_financial_services.components.FabricPipelineAssetComponent
+attributes:
+  asset_key: raw_dealer_floorplan_feed
+  generator_key: raw_dealer_floorplan_feed
+  description: >
+    Daily dealer floorplan balances, one feed per regional dealer group,
+    ingested by the pl_ingest_dealer_floorplan_feed Fabric pipeline. The one
+    asset with a genuine second partition dimension -- floorplan financing
+    arrives per region -- so a single day's midwest partition can be
+    retried or rematerialized without touching the other three regions.
+  group_name: bronze
+  kinds: [fabric, azure]
+  pipeline_name: pl_ingest_dealer_floorplan_feed
+  partitions: multi_date_dealer_group
+  dollar_metadata_column: floorplan_balance
+  fabric_item_name: pl_ingest_dealer_floorplan_feed
+  # Genuinely flaky source: four independent regional dealer-network feeds,
+  # not one deterministic synthetic call -- the only asset in this build
+  # that gets a retry policy, per CLAUDE.md's guidance against decorative
+  # retries on sources that can't actually fail intermittently.
+  retry_max: 3
+  retry_delay_seconds: 45

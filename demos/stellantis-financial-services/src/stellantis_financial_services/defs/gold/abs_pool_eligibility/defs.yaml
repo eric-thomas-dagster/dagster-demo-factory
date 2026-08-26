@@ -1,0 +1,20 @@
+type: stellantis_financial_services.components.FabricPipelineAssetComponent
+attributes:
+  asset_key: abs_pool_eligibility
+  generator_key: abs_pool_eligibility
+  description: >
+    Securitization-pool-eligible loan/lease subset -- current contracts
+    minus a documentation-exception bucket -- produced by the
+    pl_build_abs_pool_eligibility Fabric pipeline. Feeds SFS's 2026
+    auto/lease ABS securitization calendar; gated by a blocking
+    reconciliation check before it's considered pool-reportable.
+  group_name: gold
+  kinds: [fabric, azure]
+  pipeline_name: pl_build_abs_pool_eligibility
+  deps: [fact_loan_portfolio]
+  partitions: daily
+  dollar_metadata_column: outstanding_balance
+  # Investor/rating-agency reporting cadence: stale past 12h is a problem.
+  freshness_fail_hours: 12
+  freshness_warn_hours: 6
+  fabric_item_name: pl_build_abs_pool_eligibility

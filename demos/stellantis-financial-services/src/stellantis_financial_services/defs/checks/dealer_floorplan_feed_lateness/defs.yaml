@@ -1,0 +1,16 @@
+type: stellantis_financial_services.components.DuckDbAssetCheckComponent
+attributes:
+  asset_key: raw_dealer_floorplan_feed
+  check_name: dealer_floorplan_feed_lateness
+  blocking: false
+  description: >
+    The regional feed arrived before the 2pm cutoff the floorplan curtailment
+    job depends on. Maps to: "asset-level expected timing / lateness
+    visibility and downstream impact awareness."
+  sql: >
+    SELECT
+      (MAX(feed_received_at) <= '{date}T14:00:00') AS passed,
+      MAX(feed_received_at) AS latest_received_at,
+      COUNT(*) AS dealer_count
+    FROM bronze.raw_dealer_floorplan_feed
+    WHERE as_of_date = '{date}' AND dealer_group = '{dealer_group}'
