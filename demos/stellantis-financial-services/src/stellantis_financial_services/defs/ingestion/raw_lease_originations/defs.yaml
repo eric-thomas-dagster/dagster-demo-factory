@@ -1,9 +1,0 @@
-type: stellantis_financial_services.components.VendorFeedComponent
-
-attributes:
-  feed: lease_originations
-  demo_mode: true
-  demo_seed: 20260825
-  landing:
-    demo_mode: true
-    storage_account: "{{ env('SFS_AZURE_STORAGE_ACCOUNT', 'sfsdemo') }}"
