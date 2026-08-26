@@ -1,0 +1,47 @@
+[project]
+name = "stellantis_financial_services"
+requires-python = ">=3.10,<3.15"
+version = "0.1.0"
+dependencies = [
+    "azure-identity>=1.25.3",
+    "dagster==1.13.19",
+    "dagster-cloud>=1.13.19",
+    "duckdb>=1.5.5",
+    "numpy>=2.2.6",
+    "pandas>=2.3.3",
+    "pex>=2.59.5",
+    "requests>=2.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "dagster-dg-cli",
+    "dagster-webserver",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Gitignored, and hatchling excludes gitignored files from the wheel by
+# default -- they then go missing at runtime in Dagster+. See LEARNINGS.md
+# and scripts/preflight_deploy.sh.
+force-include = { "pyproject.toml" = "pyproject.toml" }
+artifacts = [
+    "src/stellantis_financial_services/defs/.local_defs_state/**",
+]
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "stellantis_financial_services"
+registry_modules = [
+    "stellantis_financial_services.components.*",
+]
+
+
+
+[project.entry-points."dagster_dg_cli.registry_modules"]
+stellantis_financial_services_components = "stellantis_financial_services.components"

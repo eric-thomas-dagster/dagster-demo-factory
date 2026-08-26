@@ -1,0 +1,339 @@
+# The 700th Package -- SFS's vendor-file -> bronze -> silver -> gold Fabric
+# pipeline graph, as one DemoFabricWorkspaceComponent instance. Every asset
+# below is a trigger-and-observe wrapper around a Fabric Data Pipeline item,
+# standing in for one of the ~700 SSIS packages SFS is migrating -- Dagster
+# triggers, tracks, and gates them; it does not reimplement their logic.
+#
+# Adding SFS's next migrated package is one more entry in `assets_by_item_name`
+# below, not a new component instance and not a new Python file.
+#
+# demo_mode: true simulates the Fabric REST API (discovery + trigger/poll) with
+# deterministic synthetic data written to a local DuckDB file standing in for
+# the Fabric lakehouse. Set demo_mode: false and fill in the workspace block
+# below to run against SFS's real Fabric workspace -- every asset key, spec,
+# partition, check, and the sensor stay identical.
+type: stellantis_financial_services.components.DemoFabricWorkspaceComponent
+attributes:
+  # demo_mode never calls this workspace, so a placeholder ID is fine and no
+  # credentials are required to run. For real mode: set demo_mode to false
+  # below, replace workspace_id with SFS's real Fabric workspace GUID, and add
+  # tenant_id / client_id / client_secret (each takes a literal or
+  # `{{ env.VAR_NAME }}`) for the service-principal with Contributor access.
+  workspace:
+    workspace_id: "demo-sfs-fabric-workspace"
+
+  demo_mode: true
+  demo_seed: 20260826
+
+  import_pipelines: true
+  import_lakehouses: false
+  import_warehouses: false
+
+  # Turns on the polling sensor that detects Fabric pipeline runs Dagster did
+  # not trigger (SFS's own scheduler, or an operator running a package by hand
+  # mid-migration) and emits AssetObservation events. Every workspace-style
+  # component in the registry defaults this to false -- opt in explicitly, or
+  # the demo only ever shows Dagster-triggered runs.
+  generate_sensor: true
+
+  assets_by_item_name:
+    raw_loan_originations:
+      key: [raw_loan_originations]
+      partitions: daily
+      group_name: bronze_ingestion
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Daily retail auto loan origination feed from dealer-submitted contracts."
+      automation_eager: false
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_1"
+        domain: "loan_servicing"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    raw_lease_originations:
+      key: [raw_lease_originations]
+      partitions: daily
+      group_name: bronze_ingestion
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Daily lease origination feed from dealer-submitted contracts."
+      automation_eager: false
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_2"
+        domain: "lease_servicing"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    raw_payment_transactions:
+      key: [raw_payment_transactions]
+      partitions: daily
+      group_name: bronze_ingestion
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Daily payment and collections transaction feed against the existing loan/lease back book."
+      automation_eager: false
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_1"
+        domain: "collections"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    raw_dealer_floorplan_feed:
+      key: [raw_dealer_floorplan_feed]
+      partitions: dealer_floorplan
+      group_name: bronze_ingestion
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Per-region dealer floorplan financing feed -- the one bronze feed with a genuine second (dealer_group) partition dimension, since floorplan arrives per-region."
+      automation_eager: false
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_2"
+        domain: "dealer_floorplan"
+        integration_pattern: "coexistence"
+        # This is one of the two packages the polling sensor observes as
+        # externally triggered -- still homegrown-scheduler-owned for the
+        # south region during the migration.
+        legacy_system_boundary: "homegrown_scheduler_owned"
+
+    raw_credit_bureau_pull:
+      key: [raw_credit_bureau_pull]
+      partitions: daily
+      group_name: bronze_ingestion
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Daily commercial/consumer credit bureau pull for that day's loan and lease applicants."
+      automation_eager: false
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_2"
+        domain: "credit_underwriting"
+        integration_pattern: "coexistence"
+        # The other package the polling sensor observes as externally
+        # triggered -- still owned by SFS's own scheduler.
+        legacy_system_boundary: "homegrown_scheduler_owned"
+
+    stg_loan_originations:
+      key: [stg_loan_originations]
+      partitions: daily
+      deps: [raw_loan_originations]
+      group_name: silver_transformation
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Conformed loan originations -- the existing stored-procedure/SSIS conforming logic, now running as a Fabric pipeline."
+      automation_eager: true
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_1"
+        domain: "loan_servicing"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    stg_lease_originations:
+      key: [stg_lease_originations]
+      partitions: daily
+      deps: [raw_lease_originations]
+      group_name: silver_transformation
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Conformed lease originations."
+      automation_eager: true
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_2"
+        domain: "lease_servicing"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    stg_payment_transactions:
+      key: [stg_payment_transactions]
+      partitions: daily
+      deps: [raw_payment_transactions]
+      group_name: silver_transformation
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Conformed payment transactions with delinquency-bucket classification applied."
+      automation_eager: true
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_1"
+        domain: "collections"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    stg_delinquency_events:
+      key: [stg_delinquency_events]
+      partitions: daily
+      deps: [stg_payment_transactions]
+      group_name: silver_transformation
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Delinquency events derived from conformed payment transactions -- feeds the ABS pool eligibility and delinquency snapshot marts."
+      automation_eager: true
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_1"
+        domain: "collections"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    dim_dealer:
+      key: [dim_dealer]
+      partitions: daily
+      deps:
+        - key: [raw_dealer_floorplan_feed]
+          partition_mapping: dealer_group_rollup
+      group_name: silver_transformation
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Dealer dimension -- rolls up all four dealer_group partitions of the floorplan feed for one date via a multi-to-single-dimension partition mapping."
+      automation_eager: true
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_2"
+        domain: "dealer_floorplan"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    dim_borrower:
+      key: [dim_borrower]
+      partitions: daily
+      deps: [stg_loan_originations, stg_lease_originations, raw_credit_bureau_pull]
+      group_name: silver_transformation
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Borrower dimension joining conformed originations with the day's credit bureau pull."
+      automation_eager: true
+      metadata:
+        owner: "Enterprise Data Management"
+        owner_team: "team:enterprise-data-management"
+        tier: "tier_2"
+        domain: "credit_underwriting"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    fact_loan_portfolio:
+      key: [fact_loan_portfolio]
+      partitions: daily
+      deps: [dim_borrower, dim_dealer]
+      group_name: gold_marts
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Loan and lease portfolio mart -- contract counts and balances by region and product type."
+      automation_eager: true
+      metadata:
+        owner: "Chris Rodriguez"
+        owner_team: "team:enterprise-data-platform"
+        tier: "tier_1"
+        domain: "loan_servicing"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    fact_delinquency_snapshot:
+      key: [fact_delinquency_snapshot]
+      partitions: daily
+      deps: [stg_delinquency_events, fact_loan_portfolio]
+      group_name: gold_marts
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Daily delinquency snapshot by region -- this is the asset someone gets paged over."
+      automation_eager: true
+      freshness_fail_hours: 6
+      freshness_warn_hours: 3
+      metadata:
+        owner: "Chris Rodriguez"
+        owner_team: "team:enterprise-data-platform"
+        tier: "tier_1"
+        domain: "collections"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+        business_impact: "Feeds delinquency-rate reporting used in ABS pool eligibility; stale data risks understating pool risk to investors."
+        severity: "high"
+        sla: "Must be no more than 6 hours stale relative to the payment transaction feed."
+
+    abs_pool_eligibility:
+      key: [abs_pool_eligibility]
+      partitions: daily
+      deps: [fact_loan_portfolio, fact_delinquency_snapshot]
+      group_name: gold_marts
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "ABS securitization pool eligibility -- the money-shot terminal asset, directly tied to SFS's 2026 ABS securitization calendar."
+      automation_eager: true
+      freshness_fail_hours: 6
+      freshness_warn_hours: 3
+      metadata:
+        owner: "Chris Rodriguez"
+        owner_team: "team:enterprise-data-platform"
+        tier: "tier_1"
+        domain: "abs_securitization"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+        business_impact: "Directly feeds up to eight 2026 auto/lease ABS securitization deals; loan-tape accuracy is under investor and rating-agency scrutiny (SEC Reg AB)."
+        severity: "critical"
+        sla: "Must be no more than 6 hours stale relative to the delinquency snapshot."
+
+    gl_reconciliation_summary:
+      key: [gl_reconciliation_summary]
+      partitions: daily
+      deps: [stg_payment_transactions, fact_loan_portfolio]
+      group_name: gold_marts
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "GL reconciliation summary -- collected vs. due, by region -- the 'hard to trust outputs' pain point made visible."
+      automation_eager: true
+      metadata:
+        owner: "Chris Rodriguez"
+        owner_team: "team:enterprise-data-platform"
+        tier: "tier_2"
+        domain: "financial_reporting"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    customer_360:
+      key: [customer_360]
+      partitions: daily
+      deps: [dim_borrower, fact_loan_portfolio, fact_delinquency_snapshot]
+      group_name: gold_marts
+      kinds: [fabric, azure]
+      owners: ["team:enterprise-data-management"]
+      description: "Customer 360 mart -- echoes the framing from SFS's own Customer Data Platform job postings."
+      automation_eager: true
+      metadata:
+        owner: "Chris Rodriguez"
+        owner_team: "team:enterprise-data-platform"
+        tier: "tier_2"
+        domain: "customer_analytics"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
+
+    powerbi_portfolio_dashboard_refresh:
+      key: [powerbi_portfolio_dashboard_refresh]
+      partitions: daily
+      deps: [fact_loan_portfolio, abs_pool_eligibility, gl_reconciliation_summary, customer_360]
+      group_name: reporting
+      kinds: [fabric, powerbi]
+      owners: ["team:enterprise-data-platform"]
+      description: "Executive portfolio dashboard refresh -- Fabric-native Power BI layer, represented as a single refresh-trigger asset (see README's three-bucket split)."
+      automation_eager: true
+      metadata:
+        owner: "Chris Rodriguez"
+        owner_team: "team:enterprise-data-platform"
+        tier: "tier_2"
+        domain: "business_intelligence"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: "migrated_to_fabric"
