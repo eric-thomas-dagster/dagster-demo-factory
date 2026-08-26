@@ -44,7 +44,8 @@ fi
 if [[ "$KEEP_LOCATION" == "0" ]]; then
   if [[ -n "${DAGSTER_CLOUD_API_TOKEN:-}" ]]; then
     echo "    deleting Dagster+ location $LOCATION"
-    dagster-cloud deployment delete-location "$LOCATION" \
+    dagster-cloud deployment delete-location \
+      --location-name "$LOCATION" \
       --organization "${DAGSTER_CLOUD_ORGANIZATION:?not set}" \
       --deployment "${DAGSTER_CLOUD_DEPLOYMENT:?not set}" \
       --api-token "$DAGSTER_CLOUD_API_TOKEN" 2>/dev/null \
@@ -80,6 +81,23 @@ with open(ledger_path, "w") as f:
     f.write("\n")
 print(f"    ledger entry for '{slug}' is now brief-ready")
 PY
+
+# Leave an explicit request so Recon has an unambiguous instruction, not just a
+# dangling ledger entry to infer from.
+REQ="$REPO_ROOT/requests/$SLUG.md"
+if [[ ! -f "$REQ" ]]; then
+  mkdir -p "$REPO_ROOT/requests/done"
+  {
+    echo "---"
+    echo "action: rebuild-brief"
+    echo "requested: $(date +%Y-%m-%d)"
+    echo "---"
+    echo
+    echo "Brief and project cleared by reset_demo.sh. Rewrite the brief from"
+    echo "scratch under the current house rules."
+  } > "$REQ"
+  echo "    wrote requests/$SLUG.md (rebuild-brief)"
+fi
 
 cat <<EOF
 
