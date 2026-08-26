@@ -22,16 +22,37 @@ re-verify. Hard cap ~100 lines.
 
 ---
 
-## Deployment packaging — extra gotchas beyond preflight_deploy.sh's own checks
+## Deployment packaging — check before deploying
 
-- `--package-name`/`-p` must be the module holding `Definitions`; verify with
-  `python -c "import <pkg>"` first. `--module-name`/`-m
-  <pkg>.definitions` also works when `Definitions` is built by a
-  `@dg.definitions`-decorated function rather than a bare module attr.
+`./scripts/preflight_deploy.sh <slug>` checks all of these in ~20s. Use it
+instead of discovering them one deploy cycle at a time.
+
+- `pex` must be installed, or `--build-method local` fails immediately.
+- `dagster-cloud` must be a project dependency, not just a CLI on PATH.
+- `--package-name` must be the module holding `Definitions`, not the project
+  directory name. Verify with `python -c "import <pkg>"`.
+- `dbt_project/` must live **inside** the Python package dir or it won't ship in
+  the wheel; the location then fails to load with a confusing path error.
+- `.gitignore`d files don't ship. dbt `target/manifest.json` and defs-state are
+  usually gitignored — force-include via `[tool.hatch.build.targets.wheel]`.
+- Run `dg utils refresh-defs-state` before deploying when using state-backed
+  components (Fivetran, dbt), or the location fails to load remotely.
+- Verify wheel *contents*, don't trust config: `python -m build` then
+  `unzip -l dist/*.whl | grep -E "manifest|defs_state"`.
 - `deploy_demo.sh` must activate the project venv first, or deploy dies with
   `dagster-cloud: command not found` after validation passed.
-- `.gitignore`d files don't ship — dbt `target/manifest.json` and defs-state
-  are usually gitignored; force-include via `[tool.hatch.build.targets.wheel]`.
+
+## Deployment — timing and confirmation
+
+- Agent sync after PEX upload routinely takes several minutes. Normal, not a
+  hang. Use a blocking wait on the background task; don't poll tightly.
+- Exit code 0 from deploy does **not** mean the location loaded. Confirm with
+  `dg api` and look for `LOADED`.
+- `LOADED` means the definitions parsed. It does **not** mean assets
+  materialize in the cloud.
+- Prefer `deploy-python-executable --build-method local` (PEX). Docker is
+  available in the sandbox, so `serverless deploy` is a real fallback for
+  source-only deps.
 
 ## Dagster+ Serverless runtime
 
@@ -61,6 +82,10 @@ re-verify. Hard cap ~100 lines.
   hang forever unattended.
 - The `dagster-community-components-cli` README is stale; the package also has
   `init`, `sync-deps`, `analyze-schedules`. Check `--help`. (0.8.15)
+- `dagster-component search` accepts **multiple terms** and `--json` for
+  machine-readable output: `dagster-component search "sql server" ssis --json`.
+  Use it — filter structured results instead of parsing prose, and pass several
+  terms in one call. (2026-08-25)
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
 
@@ -74,37 +99,19 @@ re-verify. Hard cap ~100 lines.
 - Assets and `AssetSpec`s accept `kinds={"snowflake"}` directly. Max 3 per asset.
 - `components/__init__.py` must re-export each component class, or the UI
   Components tab won't list them even when `dg list components` does.
-- Non-dbt state-backing (e.g. a resource-only registry component) still needs
-  `dg utils refresh-defs-state` before deploying if it's a state-backed
-  component — check with `dagster-component info <id>` for a `defs_state`
-  field, not just "does this project use dbt/Fivetran."
-- Current (non-legacy) freshness API: `dg.FreshnessPolicy.cron(deadline_cron=,
-  lower_bound_delta=, timezone=)` passed to `@asset(freshness_policy=...)`.
-  `dg.LegacyFreshnessPolicy` still exists but isn't the one to reach for.
-  (dagster 1.13.19)
-- `dg.build_schedule_from_partitioned_job` errors if you pass
-  `cron_schedule`/`execution_timezone` together with
-  `hour_of_day`/`minute_of_hour`, and errors again if you pass either at all
-  for a time-partitioned job — set `timezone=` on the
-  `DailyPartitionsDefinition(...)` itself instead. (dagster 1.13.19)
-- `profiles.yml` (dbt) needs a **working default path** with the env var as an
+
+## Project config
+
+- `profiles.yml` needs a **working default path** with the env var as an
   optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
   Requiring it with no fallback ships a demo that won't start.
 
-## Partitions — MultiPartitionsDefinition
+## Build sequencing that works
 
-- `MultiPartitionKey`'s string form (for `--partition` /
-  `execute_in_process`) orders dimensions **alphabetically by dimension
-  name**, not declaration order — don't hand-construct the `"a|b"` string,
-  build it directly: `dg.MultiPartitionKey({"date": d, "dealer_group": g})`.
-- `dg.MultiToSingleDimensionPartitionMapping(partition_dimension_name="date")`
-  on a downstream date-only asset's `AssetDep` maps it to *every* value of the
-  upstream's other dimension for that date — use when a downstream asset
-  rolls up a dimension (e.g. region) only the upstream carries.
-- One `dg.define_asset_job` (and `build_schedule_from_partitioned_job`)
-  requires every selected asset to share one `partitions_def`. A
-  multi-partitioned asset needs its own separate job/schedule from
-  date-only assets in the same layer.
+- Smoke-test one partition of the first ingestion asset, and inspect the table,
+  before building anything else.
+- Run `dg check defs` after each layer (ingestion → SaaS → dbt), not once at the
+  end. Failures localize instead of compounding.
 
 ## Environment
 
@@ -121,22 +128,22 @@ re-verify. Hard cap ~100 lines.
 - Microsoft Fabric is covered: `fabric_workspace`,
   `fabric_pipeline_trigger_job`, `fabric_lakehouse_resource`,
   `fabric_lakehouse_io_manager`, `dataframe_to_fabric_lakehouse`,
-  `fabric_capacity_admin_job`, `fabric_workspace_resource`. Plus ~66 Azure and
-  ~18 Databricks components, and `azure_synapse` / `synapse_sql_pool_admin_job`.
-  Search before building anything Fabric or Azure from scratch. (2026-08-26)
-- **None of the Fabric components fit a named, partitioned, checked asset
-  graph directly.** `fabric_workspace` discovers whatever items exist in a
-  live workspace as *unpartitioned* assets; `fabric_pipeline_trigger_job`
-  produces a job+schedule, not a lineage-graph asset. For a Fabric
-  trigger-and-observe demo with your own asset names/partitions/checks, wire
-  `fabric_workspace_resource` (`FabricWorkspaceResource`:
-  `list_items`/`trigger_item_run`/`wait_for_run`) as a resource via
-  defs.yaml, then write your own `@asset` functions that inject it — still
-  rung 2, just not a registry-provided asset shape. (2026-08-26)
+  `fabric_capacity_admin_job`. Plus ~66 Azure and ~18 Databricks components,
+  and `azure_synapse` / `synapse_sql_pool_admin_job`. Search before building
+  anything Fabric or Azure from scratch. (2026-08-25)
+
+## Don't rebuild platform features
+
+- Dagster+ has **native alert policies** for Slack, Teams, email, and
+  PagerDuty, covering run failures, asset check failures, freshness violations,
+  and schedule/sensor failures. Never hand-roll alerting in a demo — it implies
+  the platform lacks something it has. Show it in the UI instead. (2026-08-25)
 
 ## Dead ends
 
-- **Never model recovery as an action inside Dagster.** No heal asset, no heal
-  job, no reset object. Assets are idempotent — model late data as source
-  arrival timing in the mock so a plain rematerialize is the whole story. A
-  disconnected `healed_partitions` node reads as scaffolding.
+- **Never plant a failure in a demo.** No anomalies, corrupt partitions, or
+  missing data — not behind a flag. A demo that can fail will fail live, on the
+  path nobody rehearsed. Build the checks and explain what they'd catch in
+  production, against a green graph. Corollary: nothing to heal, so no heal
+  asset, heal job, or reset object; a disconnected `healed_partitions` node
+  reads as scaffolding. Briefs cannot override this. (2026-08-25)

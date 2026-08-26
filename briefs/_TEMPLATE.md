@@ -78,7 +78,12 @@ matching their real world. Target 12–25 assets. -->
 
 ## Demo shape
 
-<!-- build-a-pipeline | orchestrate-existing-workloads | both. If they mainly
+<!-- build-a-pipeline | orchestrate-existing-workloads | migration-both-states.
+If they're mid-migration (SSIS->Fabric, Airflow->X, on-prem->cloud), specify
+BOTH states: orchestrating the legacy estate they're moving off AND the new
+platform, with lineage crossing between them in one graph. Orchestrating the
+legacy side is the point, not a distraction — it makes the story additive
+instead of rip-and-replace. If they mainly
 want Dagster over what they already run (Fabric, Databricks, Airflow, Synapse),
 say so — that changes the whole build toward external assets and
 trigger-and-observe rather than a transformation graph. -->
@@ -105,15 +110,11 @@ specific-and-wrong. -->
      engine — e.g. snowflake, fivetran, dbt. DuckDB runs it; the UI shouldn't
      say so. dbt kinds come from the manifest adapter_type, so the translator
      needs overriding. -->
-- **Failure demonstration:** <!-- no (default) | yes. Default is a GREEN demo:
-     checks, freshness policies, retries, and alerting are configured and
-     visible, and Eric talks through what happens when they fire. Only set yes
-     if a live staged failure is genuinely wanted. -->
-- **If yes — planted anomaly:** <!-- which partition, which check catches it.
-     Recovery is plain rematerialization: model late arrival as source state.
-     Never a heal asset, heal job, or reset object. -->
-- **Demo reset:** <!-- how to re-run this demo a second time. A script or make
-     target outside Dagster, operating on the mock source state. -->
+- **Everything materializes green.** Do NOT spec a planted anomaly, a corrupted
+     partition, or any failure scenario — demos always work. Checks, freshness
+     policies, and alerting are built and visible, and Eric talks through what
+     happens when they fire in production. That talk track goes in the
+     Capability talk track section below. -->
 - **Data realism notes:** <!-- cardinalities, date ranges, expected skew -->
 
 ## Money shot
@@ -126,7 +127,11 @@ kinds matching their stack. -->
 
 <!-- What Eric says while the graph sits green. For each capability built in:
 what it does, what happens when it fires, and which pain from above it answers.
-This is the substitute for staging a live failure. -->
+This is the substitute for staging a live failure.
+
+Include platform capabilities that need no build — Dagster+ native alerting to
+Slack/Teams/email/PagerDuty is the main one. Don't spec custom alerting unless
+there's a real gap the built-in policies don't cover; note that gap here if so. -->
 
 ## Explicitly out of scope
 

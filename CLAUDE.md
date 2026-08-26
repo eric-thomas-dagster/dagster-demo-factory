@@ -70,16 +70,31 @@ green:
   decorative retry on a deterministic synthetic source invites a question we'd
   lose. Skipping one and saying why beats padding coverage.
 - **Automation conditions** — showing what would recompute, and when.
-- **Alerting hooks / sensors** — configured, pointing somewhere plausible.
+- **Alerting** — *don't build it.* Dagster+ ships alert policies for Slack,
+  Teams, email, and PagerDuty covering run failures, asset check failures,
+  freshness violations, and schedule/sensor failures. Point at that in the UI
+  and talk through it. Only write a custom sensor or hook when the brief names
+  a use case Dagster+ alert policies genuinely don't cover — and say why in the
+  notification when you do.
 
 The talk track is *"here's what happens when this breaks"*, delivered against a
 green graph. That's a stronger demo than a broken one and it removes the risk
 of a staged failure not recovering live.
 
-**Only stage a live failure when the brief explicitly asks for it**, under
-`Failure demonstration: yes`. It's opt-in, never the default. When it is asked
-for, recovery is still plain rematerialization — see the idempotency rule
-below.
+**Demos always work. There is no exception the brief can grant.**
+
+Do not plant anomalies, corrupt partitions, seed missing data, or build any
+scenario whose purpose is to make something fail. Not in demo mode, not behind
+a flag, not "available if he wants it." A demo that can fail is a demo that
+will fail, in front of the room, on the one path nobody rehearsed.
+
+A brief asking for a planted failure is a brief that predates this rule —
+**ignore that part of it and say so in the notification.** Only an explicit
+instruction from Eric in the run's fire payload can override this, and even
+then recovery is plain rematerialization, never a heal object.
+
+The checks exist for when things break in *production*. That's the talk track.
+Their value is entirely explicable against a green graph.
 
 ## Match the prospect's stack visually, even when execution is local
 
@@ -244,6 +259,65 @@ all of this beats twenty showing none of it.
   prospect's personas would actually look at.
 - **Asset groups and kinds**, so the graph reads cleanly on a shared screen.
 
+## YAML-first — the defs folder is mostly defs.yaml
+
+**This is what we're selling.** A demo built out of hand-written Python asset
+functions shows a prospect that Dagster is a Python framework. A demo built out
+of `defs.yaml` pointing at components shows them a platform their whole team can
+extend. The second is the product.
+
+- **The `defs/` tree should be predominantly `defs.yaml`.** Aim for the large
+  majority of definition files to be YAML. If most of `defs/` is `.py`, the
+  build went wrong regardless of how good the Python is.
+- **Custom Python belongs in a component**, not in `defs/`. Write the component
+  class once under `components/`, then instantiate it as many times as needed
+  from YAML. Per-asset Python functions in `defs/` are the anti-pattern.
+- **Every `.py` file in `defs/` needs a one-line justification** in the
+  notification saying why it couldn't be YAML. If you can't justify it, convert
+  it.
+- Report the YAML-to-Python file count in `defs/` in the notification, every
+  run. A number you have to state is a number you'll notice.
+
+The instinct to reach for Python is strong because it's faster to write. It is
+also the thing that makes the demo argue against us.
+
+## Migration prospects: show current AND future state
+
+When a prospect is mid-migration — SSIS to Fabric, Airflow to something else,
+on-prem to cloud — the strongest demo shows **both states in one asset graph**,
+with lineage crossing between them.
+
+Orchestrating the legacy estate they're moving *off* is not a distraction; it's
+the whole reason the story is additive rather than a rip-and-replace. If the AE
+notes mention what they're migrating from, build assets for it: trigger and
+observe the legacy jobs, and show the new-platform assets downstream of them.
+
+The line is *"Dagster orchestrates what you have today and what you're moving to,
+during the migration, with one lineage graph across both."* That's a much harder
+thing for a competitor to answer than a demo of the destination alone.
+
+## When you write a custom component, write feedback
+
+If the escalation ladder falls all the way through to a custom component, the
+community registry has a gap worth closing. Capture it while you know why.
+
+Write `component-feedback/<YYYY-MM-DD>-<topic>.md` in this repo containing:
+
+- **What was needed** — the capability, in one or two sentences.
+- **What was searched** — the exact `dagster-component search` terms tried.
+- **What came closest** — the component ID, and specifically **why it didn't
+  fit**: no partition support, wrong auth model, missing a config field, schema
+  too rigid, no demo_mode seam, whatever it actually was.
+- **What was built instead** — a short description, and the file path on the
+  branch.
+- **Suggested change** — the smallest edit to the existing component that would
+  have made it work, if there is one.
+
+Be specific about the *why*. "Didn't fit" is useless; "no way to inject a
+partition key into the request path" is actionable. This file is the input to
+improving the registry, so vague feedback wastes the run's most valuable
+byproduct.
+
 ## Component escalation ladder
 
 Do not skip a rung:
@@ -262,6 +336,7 @@ in `LEARNINGS.md`.
 | Path | Purpose |
 |---|---|
 | `docs/RUNBOOK.md` | **How to operate this — read this first if you're a human.** |
+| `component-feedback/` | One file per registry gap, written whenever a build falls through to a custom component. |
 | `briefs/` | One markdown brief per prospect. `_TEMPLATE.md` is the required shape. |
 | `demos/<slug>/` | Generated Dagster projects, one directory per prospect. |
 | `templates/demo_mode_pattern.py` | **Read before writing any demo component.** |
