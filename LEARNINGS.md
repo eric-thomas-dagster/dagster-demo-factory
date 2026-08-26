@@ -110,6 +110,17 @@ instead of discovering them one deploy cycle at a time.
 - Run `dg check defs` after each layer (ingestion → SaaS → dbt), not once at the
   end. Failures localize instead of compounding.
 
+## Connector quirks
+
+- **Drive search only returns Google-native files.** Docs/Sheets/Slides are
+  searchable; PDFs, DOCX, XLSX, PPTX are not, even though Drive indexes them.
+  Use the recent-files listing (returns metadata for all types) alongside
+  search, then read the file directly — *reading* PDFs and Office files works,
+  only search is blind to them. (2026-08-26)
+- Shared Drive content sometimes returns empty and looks like a permissions
+  error but isn't. If a Shared Drive comes back blank, ask for the file by
+  exact name or URL. (2026-08-26)
+
 ## Environment
 
 - `GH_TOKEN` reads as literal `proxy-injected` when the GitHub proxy handles
