@@ -7,12 +7,12 @@
       "status": "brief-ready",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-26-stellantis-financial-services.md",
-      "timestamp": "2026-08-26T19:30:00Z",
+      "timestamp": "2026-08-26T21:50:00Z",
       "deployed_at": "2026-08-26T16:50:43Z",
       "location_name": "demo-stellantis-financial-services",
       "deployment": "prod",
       "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/10",
-      "note": "Fourth build. Subclasses the registry's fabric_workspace component (DemoFabricWorkspaceComponent) per the rewritten brief's mandate, instead of the custom FabricPipelineAssetComponent PR #9 wrote \u2014 confirms the subclass rung works end-to-end for this shape.",
+      "note": "Fourth rewrite. Requeued (commit 2693658) right after CLAUDE.md gained 'Observe, don't just execute' and 'The workspace-component convention'. PR #10's DemoFabricWorkspaceComponent subclassed fabric_workspace correctly (one instance, one mapping table) but never set polling_sensor/generate_sensor (default False on every workspace component), so the demo never showed a run Dagster didn't trigger \u2014 confirmed by reading the deleted defs.yaml and component file directly, neither mentions 'sensor'. Brief now mandates generate_sensor: true and a money-shot moment built around it. Also brought up to the current _TEMPLATE.md shape (Fidelity, Three buckets, Demo name sections added).",
       "reset_at": "2026-08-26T17:47:35"
     },
     {
