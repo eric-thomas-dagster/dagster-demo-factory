@@ -1,0 +1,21 @@
+kapitus:
+  target: "{{ env_var('KAPITUS_DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # `__init__.py` sets this env var to a working project-relative default
+      # (`demo_data/demo.duckdb`) before Dagster loads any defs, so this
+      # always resolves even with zero manual setup. Override it to point
+      # dbt at a different DuckDB file without touching this profile.
+      path: "{{ env_var('KAPITUS_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    live:
+      type: snowflake
+      account: "{{ env_var('KAPITUS_SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('KAPITUS_SNOWFLAKE_USER') }}"
+      password: "{{ env_var('KAPITUS_SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('KAPITUS_SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('KAPITUS_SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('KAPITUS_SNOWFLAKE_WAREHOUSE') }}"
+      schema: "marts"
+      threads: 4

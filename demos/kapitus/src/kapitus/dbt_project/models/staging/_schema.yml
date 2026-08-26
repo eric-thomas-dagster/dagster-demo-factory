@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: stg_loan_applications
+    description: "Typed loan applications and their funding decisions."
+    columns:
+      - name: application_id
+        data_tests: [unique, not_null]
+      - name: business_id
+        data_tests: [not_null]
+      - name: requested_amount
+        data_tests: [not_null]
+
+  - name: stg_bank_statement_data
+    description: "Typed OCR-derived bank statement analysis."
+    columns:
+      - name: statement_id
+        data_tests: [unique, not_null]
+      - name: business_id
+        data_tests: [not_null]
+
+  - name: stg_credit_bureau_pulls
+    description: "Typed commercial credit bureau pulls."
+    columns:
+      - name: pull_id
+        data_tests: [unique, not_null]
+      - name: business_id
+        data_tests: [not_null]
+
+  - name: dim_borrower
+    description: "One row per business, with its most recent underwriting signals."
+    columns:
+      - name: business_id
+        data_tests: [unique, not_null]
+
+seeds:
+  - name: dim_product_line
+    description: "Kapitus's five lending product lines and their typical shape."
+    columns:
+      - name: product_line
+        data_tests: [unique, not_null]

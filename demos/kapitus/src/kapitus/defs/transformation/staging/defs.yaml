@@ -1,0 +1,28 @@
+type: kapitus.components.KapitusDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_staging
+  select: "stg_loan_applications stg_bank_statement_data stg_credit_bureau_pulls dim_borrower dim_product_line"
+  translation:
+    group_name: staging
+    partitions_def: "{{ multi_partitions_def }}"
+
+post_processing:
+  assets:
+    - target: "staging/stg_loan_applications"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "staging/stg_bank_statement_data"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "staging/stg_credit_bureau_pulls"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "staging/dim_borrower"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"

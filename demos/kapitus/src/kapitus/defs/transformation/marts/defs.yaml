@@ -1,0 +1,26 @@
+type: kapitus.components.KapitusDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts
+  select: "funded_loans_daily portfolio_performance_by_product credit_risk_summary"
+  translation:
+    group_name: marts
+    partitions_def: "{{ multi_partitions_def }}"
+
+post_processing:
+  assets:
+    - target: "marts/funded_loans_daily"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+        freshness_policy: "{{ funded_loans_freshness }}"
+    - target: "marts/portfolio_performance_by_product"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "marts/credit_risk_summary"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
