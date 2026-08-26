@@ -36,8 +36,21 @@ instead of discovering them one deploy cycle at a time.
 
 - `pex` must be installed, or `--build-method local` fails immediately.
 - `dagster-cloud` must be a project dependency, not just a CLI on PATH.
-- `--package-name` must be the module holding `Definitions`, not the project
-  directory name. Verify with `python -c "import <pkg>"`.
+- **Use `--module-name "<pkg>.definitions"` on the actual deploy command, not
+  `--package-name "<pkg>"`.** `CLAUDE.md`'s own documented deploy command uses
+  `--package-name`, but when the project's `<pkg>/__init__.py` doesn't
+  re-export `defs` (true of every demo built so far — Kapitus, ISO NE, and
+  this one all only `os.environ.setdefault(...)` there), the remote grpc
+  server's `loadable_targets_from_python_package` finds nothing and the
+  location fails to load with `No Definitions, RepositoryDefinition, Job,
+  Pipeline, Graph, or AssetsDefinition found in "<pkg>"` — a deploy-command
+  *exit code 0* failure, only caught by the post-deploy LOADED check.
+  `scripts/deploy_demo.sh` already uses `--module-name` and gets this right;
+  a manual deploy command copied from `CLAUDE.md` does not. Use the script,
+  or use `--module-name` directly if deploying by hand. (verified 2026-08-26)
+- `preflight_deploy.sh`'s `--package-name` argument is unrelated to the above
+  — it's only used locally for `python -c "import <pkg>"`, not passed to the
+  deploy command itself.
 - `dbt_project/` must live **inside** the Python package dir or it won't ship in
   the wheel; the location then fails to load with a confusing path error.
 - `.gitignore`d files don't ship. dbt `target/manifest.json` and defs-state are
@@ -104,14 +117,23 @@ instead of discovering them one deploy cycle at a time.
   verified 2026-08-24)
 - `components/__init__.py` must re-export each component class, or the UI
   Components tab won't list them even when `dg list components` does.
+- `dg.AssetSpec(...)` natively accepts `partitions_def`, `freshness_policy`,
+  and `automation_condition` — build the full spec there rather than composing
+  policies on afterward. `owners=` entries must be an email or `"team:x"`;
+  a plain name raises at spec-construction time. (dagster 1.13.19)
+- `dg.build_schedule_from_partitioned_job(...)` rejects `cron_schedule` /
+  `execution_timezone` for a time-partitioned job (`DailyPartitionsDefinition`
+  etc.) — use `hour_of_day` / `minute_of_hour` instead; the cadence is derived
+  from the partitions_def. (dagster 1.13.19)
+- `dg.MultiToSingleDimensionPartitionMapping(partition_dimension_name=...)`
+  works for rolling a multi-partitioned dep into a single-dimension downstream
+  asset, but is `@beta` — emits a warning, not an error. (dagster 1.13.19)
 
 ## Project config
 
 - `profiles.yml` needs a **working default path** with the env var as an
   optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
   Requiring it with no fallback ships a demo that won't start.
-
-## Build sequencing that works
 
 ## Connector quirks
 
@@ -150,8 +172,24 @@ instead of discovering them one deploy cycle at a time.
   `SnowflakeWorkspaceComponent`, `MLflowWorkspaceComponent`,
   `DatabricksWorkspaceComponent`, `PowerBIWorkspaceComponent`. (verified
   2026-08-26)
-- **Observation sensors default to OFF.** Set `generate_sensor: true` or a demo
-  only executes and never sees runs it didn't trigger. (2026-08-26)
+- **Observation sensors default to OFF, AND on `fabric_workspace` specifically,
+  `generate_sensor: true` alone still builds no sensor.** Read
+  `integrations/fabric_workspace/component.py` (main, 2026-08-26) in full:
+  `polling_sensor` is a declared `Field`, referenced nowhere else in the file.
+  `StateBackedComponent.build_defs` (installed `dagster` 1.13.19 source) only
+  calls `build_defs_from_state` — no sensor-assembly step anywhere in the base
+  class either. The subclass must build the `SensorDefinition` itself inside
+  its own `build_defs_from_state` override, gated on the same field. Filed as
+  `component-feedback/2026-08-26-fabric-workspace-polling-sensor.md`; don't
+  assume this holds for the other workspace components without re-reading
+  their source, since the docstring convention is shared but the
+  implementation apparently isn't always.
+- **`get_asset_spec(props)` on `FabricWorkspaceComponent` is only invoked by
+  `_apply_translation` when a `translation:` callable is also configured** —
+  the override hook is real, but calling it yourself directly (bypassing
+  `_apply_translation`) is the reliable way to use it, rather than relying on
+  the base component to call it for you. (verified 2026-08-26, dagster
+  community-components-cli `fabric_workspace`)
 - `StateBackedComponent` enumeration happens in the **state-write path**, so no
   HTTP fires at Dagster load time. "It queries a live connection at load time"
   is not a valid reason to reject one. (2026-08-26)

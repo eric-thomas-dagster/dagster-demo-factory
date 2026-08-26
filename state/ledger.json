@@ -4,15 +4,16 @@
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-26-stellantis-financial-services.md",
       "timestamp": "2026-08-26T21:50:00Z",
-      "deployed_at": "2026-08-26T16:50:43Z",
+      "deployed_at": "2026-08-26T22:52:00Z",
       "location_name": "demo-stellantis-financial-services",
       "deployment": "prod",
-      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/10",
-      "note": "Fourth rewrite. Requeued (commit 2693658) right after CLAUDE.md gained 'Observe, don't just execute' and 'The workspace-component convention'. PR #10's DemoFabricWorkspaceComponent subclassed fabric_workspace correctly (one instance, one mapping table) but never set polling_sensor/generate_sensor (default False on every workspace component), so the demo never showed a run Dagster didn't trigger \u2014 confirmed by reading the deleted defs.yaml and component file directly, neither mentions 'sensor'. Brief now mandates generate_sensor: true and a money-shot moment built around it. Also brought up to the current _TEMPLATE.md shape (Fidelity, Three buckets, Demo name sections added).",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/11",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-stellantis-financial-services",
+      "note": "Fifth build (fourth rewrite's brief). Root cause of the prior three failures: fabric_workspace's polling_sensor field is declared but StateBackedComponent.build_defs never builds a sensor from it (verified by reading both sources in full) -- generate_sensor: true was always a no-op regardless of which build set it. DemoFabricWorkspaceComponent builds the SensorDefinition itself, gated on the same field. Also: deploy must use --module-name '<pkg>.definitions', not --package-name '<pkg>' -- this project's definitions.py is not re-exported from __init__.py (matches Kapitus/ISO NE's own layout), so the first manual deploy attempt (bypassing scripts/deploy_demo.sh) failed to load with 'No Definitions ... found'; scripts/deploy_demo.sh already had this right. Deleted the failed location before redeploying via the script.",
       "reset_at": "2026-08-26T17:47:35"
     },
     {
