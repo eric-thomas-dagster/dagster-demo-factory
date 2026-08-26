@@ -163,6 +163,9 @@ instead of discovering them one deploy cycle at a time.
   and schedule/sensor failures. Never hand-roll alerting in a demo — it implies
   the platform lacks something it has. Show it in the UI instead. (2026-08-25)
 
+- Jobs: use `define_asset_job` with `AssetSelection`. Never call asset functions
+  inside a job definition. (2026-08-26)
+
 ## Dead ends
 
 - **Never plant a failure in a demo.** No anomalies, corrupt partitions, or

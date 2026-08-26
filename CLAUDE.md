@@ -103,12 +103,7 @@ green:
   decorative retry on a deterministic synthetic source invites a question we'd
   lose. Skipping one and saying why beats padding coverage.
 - **Automation conditions** — showing what would recompute, and when.
-- **Alerting** — *don't build it.* Dagster+ ships alert policies for Slack,
-  Teams, email, and PagerDuty covering run failures, asset check failures,
-  freshness violations, and schedule/sensor failures. Point at that in the UI
-  and talk through it. Only write a custom sensor or hook when the brief names
-  a use case Dagster+ alert policies genuinely don't cover — and say why in the
-  notification when you do.
+- **Alerting** — *don't build it.* See "Three buckets" below.
 
 The talk track is *"here's what happens when this breaks"*, delivered against a
 green graph. That's a stronger demo than a broken one and it removes the risk
@@ -259,6 +254,128 @@ What follows from this:
 
 If a node in the asset graph isn't something the prospect would recognise as
 part of their own data flow, it doesn't belong there.
+
+## Three buckets — classify every capability before building it
+
+Every capability the brief mentions goes in exactly one bucket, and the split
+belongs in the project README:
+
+1. **Implemented in code** — assets, checks, freshness policies, automation
+   conditions, components, integration surfaces. This repo builds these.
+2. **Handled by Dagster+** — a platform capability you *demonstrate*, not
+   implement. Point at it in the UI.
+3. **Conversation only** — a roadmap item, a customer-side integration, or an
+   architecture discussion. Mention it, build nothing, generate no placeholder
+   code.
+
+**Never implement bucket 2 or 3.** Building a hand-rolled version of a platform
+feature is worse than omitting it: it implies the platform lacks something it
+has, and it's code the prospect would never write.
+
+Bucket 2, non-exhaustive: alerting to Slack/Teams/email/PagerDuty, SSO, restart
+and recovery from failure, re-run from point of failure, lineage visualization,
+asset health and landing pages, run history and duration trends, backfill UI,
+Issues, RBAC, audit trail. **Restart-from-failure especially** — that's a
+Dagster capability you show working, never something to code.
+
+Bucket 3, typical: ticketing integrations, webhook fan-out to external systems,
+IaC and deployment topology, catalog integrations that don't exist yet. Note
+where an event *could* feed an external system; write no code for it.
+
+Getting this wrong in either direction costs you. Build bucket 2 and you argue
+against the product. Claim bucket 1 for something in bucket 3 and you've
+oversold.
+
+## Size the graph to the use case — the brief decides
+
+**There is no default asset count.** Some use cases are carried by six assets;
+some need thirty to look like the prospect's actual estate. A migration or
+platform-consolidation story usually needs *many* assets, because looking
+comprehensive is the point — a thin graph undersells the scope they're asking
+about. A single-pipeline story is better small.
+
+Follow the brief's asset list. If it calls for 30 assets and 25 checks, build
+them. Do not trim for tidiness.
+
+What to avoid is **overengineering**, which is a different thing from size:
+files that exist only for completeness, abstractions with one caller, config
+surfaces nobody will touch, Python where YAML would do. A large graph made of
+one component instantiated 25 times from `defs.yaml` is excellent. Twenty-five
+hand-written Python assets is not — see the YAML-first and scaling rules.
+
+**Runnable is non-negotiable regardless of size.** Everything materializes, the
+graph reads cleanly with groups and kinds, and it loads fast. If size threatens
+that, fix the structure rather than cutting assets.
+
+Give the demo a **name** — a short scenario title like "Crypto Portfolio Health"
+or "Late Carrier Data" — and put it in the README and the notification. A demo
+you can say the name of is a demo you can pitch in one line.
+
+**Be explicit about assumptions.** Anything you inferred rather than read in the
+brief goes in the README and the notification, marked as an assumption.
+
+## Fidelity: graph-first vs data-backed
+
+Two valid demo builds. **The brief chooses; default is graph-first.**
+
+**Graph-first** — Dagster asset bodies are `pass`. No synthetic data, no mocked
+I/O, no generators. Real dbt SQL still runs (that's where lineage is legible).
+Everything materializes instantly and always green, because a `pass` asset can't
+fail.
+
+Use it when the demo is about lineage, metadata, freshness, automation,
+observability, and coexistence — which is most demos. Builds far faster, has
+almost no failure surface, and removes the entire demo_mode I/O apparatus.
+
+**Data-backed** — asset bodies produce real synthetic data through mocked
+components. Costs a lot more build time and carries real failure risk.
+
+Only justified when the demo needs *actual values* on screen: row counts that
+move, check results computed from data, a materialization that visibly changes a
+number. If nobody in the room will look at a value, don't build the machinery
+that produces it.
+
+When graph-first, asset bodies contain `pass` and nothing else. No business
+logic in Dagster asset bodies either way — that belongs in dbt or in a
+component.
+
+## Required metadata on every asset
+
+Uniform, not ad hoc. Every asset carries:
+
+- `group_name` and `kinds` (kinds match the prospect's stack, not the engine)
+- `owner` and `owner_team`
+- `tier` and `domain`
+- `description`
+
+**Then add narrative metadata — the metadata panel is the script.** Put the
+talking points where they're visible when you click an asset, so the story is
+in the product rather than in your memory:
+
+- Deployment posture: `deployment_mode`, `data_residency`,
+  `control_plane_egress`
+- Legacy integration: `integration_pattern`, `external_job_id`,
+  `scheduler_owner`, `legacy_system_boundary`
+- Business framing: `business_impact`, `severity`, `sla`
+
+Metadata is *secondary* to real configuration. A `freshness` metadata field is
+not a freshness policy. Build the native capability, then annotate it.
+
+## Coexistence: name the direction
+
+"Orchestrating existing workloads" is four distinct patterns. Build the ones the
+brief calls for and label each with `integration_pattern`:
+
+1. **Legacy triggers Dagster** — their scheduler starts a Dagster run.
+2. **Dagster calls legacy** — Dagster submits to their system and polls it.
+3. **Bidirectional feedback** — Dagster reports completion/failure back so their
+   scheduler's downstream dependencies resolve.
+4. **Coexistence** — their scheduler stays master for legacy workloads; Dagster
+   owns the new estate; lineage spans both.
+
+Pattern 4 is usually the one that closes. It says they don't have to choose a
+migration date. Make the boundary explicit in the graph with
+`legacy_system_boundary`.
 
 ## Dagster feature floor — every demo, unless the brief forbids it
 
@@ -566,8 +683,11 @@ A project that loads but crashes on materialize must not be deployed.
 **Their vocabulary, not ours.** Assets named `member_eligibility_daily`, not
 `staging_table_2`. Pull the nouns from the AE's discovery notes.
 
-**Scope down rather than ship broken.** A clean 8-asset demo beats a broken
-22-asset one. If time is running out, cut a branch of the graph and say so.
+**Ship working rather than complete — but cut in the right order.** If time is
+running out: simplify structure first (collapse Python into a component
+instantiated from YAML), then drop optional capabilities, and only then cut
+assets. Asset count is the last thing to sacrifice, not the first — the brief
+asked for that size for a reason. Whatever you cut, name it and say why.
 
 ## Secrets
 
