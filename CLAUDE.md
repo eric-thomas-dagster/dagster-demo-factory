@@ -4,6 +4,20 @@ This repo generates custom Dagster demo projects for sales prospects,
 autonomously, overnight. Two Claude Code routines operate on it:
 `Prospect Recon` (research → brief) and `Demo Factory` (brief → deployed demo).
 
+## Demos vs POCs — two different artifacts
+
+**This file governs DEMO builds.** A demo is synthetic, always-green, disposable,
+and built for a 50-minute room from AE discovery notes.
+
+**POC builds follow `docs/POC-PLAYBOOK.md`, which inverts several rules here** —
+most importantly, POCs *must* be able to fail on demand, because induced failures
+are the graded criterion. POCs are built from a customer's own scenario
+specification, run against their real systems by their engineers, and live in
+their own repo.
+
+If you're unsure which you're building, you're building a demo. POC builds only
+happen from an explicit POC scenario document, via the POC Builder routine.
+
 ## Who reads the output
 
 A prospect's data engineering team, during an evaluation, on a shared screen,
@@ -16,6 +30,25 @@ Use `dagster-expert` for every Dagster API decision and `dignified-python` for
 every line of Python. Both live in `.claude/skills/` and are committed here
 specifically because cloud routine sessions can only load skills from the
 cloned repo.
+
+## Two CLAUDE.md files — precedence
+
+`dagster-component init` writes its own ~660-line `CLAUDE.md` into each
+generated project. It's good reference — CLI usage, validation levels, common
+gotchas, a task-to-component cheatsheet, and pointers to the registry
+walkthroughs — and Claude Code loads it alongside this file when working in
+`demos/<slug>/`. Keep it; it also helps the prospect if they clone the repo.
+
+**But this file wins where they conflict**, and one conflict is guaranteed: the
+generated doc has a section on asking the user clarifying questions before
+generating, with an example dialog. That is right for interactive use and wrong
+here. **Routine runs are unattended — never ask, never wait.** Where it says to
+ask, take the answer from the brief; where the brief is silent, choose the
+option most consistent with these house rules and note the choice in the
+notification.
+
+Its registry-usage guidance is authoritative and should be followed. Its
+workflow guidance is not.
 
 ## Read LEARNINGS.md before building
 
@@ -325,6 +358,52 @@ Anti-patterns, all of which mean the build went wrong:
 If the explicit mapping is long, that's fine — a 40-entry `assets_by_task_key`
 block is *good*, because it shows the prospect exactly how their estate maps in.
 
+## Observe, don't just execute
+
+A demo that only *triggers* external jobs is half a product. In the real world
+someone runs that Fabric pipeline by hand, or a scheduled job fires outside
+Dagster, and the prospect's question is always *"what happens when it wasn't
+Dagster that started it?"*
+
+**Every external-system component in a demo must observe as well as execute.**
+Workspace-style components ship a polling sensor that detects externally
+triggered runs and emits `AssetObservation` events — but **it is off by
+default.** Turn it on:
+
+```yaml
+type: ...FabricWorkspaceComponent
+attributes:
+  generate_sensor: true     # alias for polling_sensor; default is false
+```
+
+Check for it on every workspace component you use. The convention is shared
+across `FabricWorkspaceComponent`, `FivetranAccountComponent`,
+`SnowflakeWorkspaceComponent`, `MLflowWorkspaceComponent`,
+`DatabricksWorkspaceComponent`, and `PowerBIWorkspaceComponent` — though the
+field name may vary, so read the component before assuming.
+
+If a component you need has no observation surface, that's worth a
+`component-feedback/` entry, and the sensor is worth adding in a subclass.
+
+## The workspace-component convention
+
+Workspace-style components across the registry follow one shape. Learn it once
+and it applies everywhere:
+
+- `@public` class
+- a `translation:` callable field
+- a `@public get_asset_spec(props)` hook — **the documented override point for
+  customizing asset keys, tags, deps, and metadata**
+- `polling_sensor` (alias `generate_sensor`), opt-in
+- `defs_state` + `defs_state_config`
+- `StateBackedComponent` inheritance, with enumeration in the state-write path
+  so no HTTP fires at Dagster load time
+
+That last point matters: **"it queries a live connection at load time" is not
+true of these components and never a reason to reject one.** Enumeration happens
+when state is written, not when definitions load. And `get_asset_spec(props)` is
+the sanctioned way to give assets your own keys rather than the source system's.
+
 ## Rung 3 is not optional — subclass before you write custom
 
 The most common failure is jumping from "the registry component doesn't fit
@@ -358,6 +437,36 @@ components to add a demo-mode seam, explicit `assets_by_task_key` mapping, and
 op-naming fixes — while keeping the parent's behaviour in production. Its
 `README.md` has a table of which subclasses are genuinely required and which
 just add demo mode. That is the shape to copy.
+
+## A justified custom component still follows the convention
+
+When rung 4 is genuinely right — nothing in the registry touches the domain —
+build it to the **workspace-component convention** above, not as a one-off. That
+means: a `@public get_asset_spec(props)` override hook, an opt-in polling sensor,
+`StateBackedComponent` inheritance with enumeration in the state-write path, and
+a `translation:` field.
+
+Two reasons. It must work with `demo_mode: false` against the customer's real
+system, not just in the demo — otherwise the "point it at yours" moment fails.
+And a component built to the convention can be contributed back to the registry,
+which is how the gap actually closes.
+
+Build it against the real API, then add the demo-mode seam on top. Building the
+mock first and bolting real support on later produces something that only ever
+works in the demo.
+
+**The shape for any external job system is enumerate, execute, observe:**
+
+1. **Enumerate** — list the system's jobs/packages/pipelines from its catalog or
+   API into asset specs, in the state-write path so nothing fires at load time.
+2. **Execute** — submit a run through the system's own API and poll it to a
+   terminal state, surfacing its status, duration, and errors as first-class.
+3. **Observe** — a polling sensor over the system's own run history, so runs
+   started *outside* Dagster still produce `AssetObservation` events.
+
+That triad generalizes to every job system — legacy schedulers, ETL tools,
+notebook platforms, whatever the prospect runs. Find the API's equivalents of
+those three operations and map them; the specifics differ, the shape doesn't.
 
 ## When you write a custom component, write feedback
 
@@ -407,6 +516,8 @@ in `LEARNINGS.md`.
 | Path | Purpose |
 |---|---|
 | `docs/RUNBOOK.md` | **How to operate this — read this first if you're a human.** |
+| `docs/POC-PLAYBOOK.md` | Rules for POC builds. Inverts several rules in this file. |
+| `pocs/<slug>/` | POC projects, when a standalone repo couldn't be created. |
 | `component-feedback/` | One file per registry gap, written whenever a build falls through to a custom component. |
 | `briefs/` | One markdown brief per prospect. `_TEMPLATE.md` is the required shape. |
 | `demos/<slug>/` | Generated Dagster projects, one directory per prospect. |
