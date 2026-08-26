@@ -74,7 +74,20 @@ these things out loud in a room. -->
 ## Asset graph
 
 <!-- Name the assets. Group them into layers. Specify partitions and cadence
-matching their real world. Target 12–25 assets. -->
+matching their real world.
+
+NO default asset count — size it to the use case. Migration or platform-
+consolidation stories usually need MANY assets, because looking comprehensive
+is the point and a thin graph undersells the scope. A focused single-pipeline
+story is better small. Say how many and why. -->
+
+## Fidelity
+
+<!-- graph-first (default) | data-backed. graph-first = Dagster asset bodies are
+`pass`, real dbt SQL, no synthetic data or mocked I/O. Far faster, always green,
+and enough for lineage/metadata/freshness/automation/coexistence stories. Choose
+data-backed ONLY if real values on screen matter — row counts that move, check
+results computed from data. Say which and why. -->
 
 ## Demo shape
 
@@ -116,6 +129,21 @@ specific-and-wrong. -->
      happens when they fire in production. That talk track goes in the
      Capability talk track section below. -->
 - **Data realism notes:** <!-- cardinalities, date ranges, expected skew -->
+
+## Three buckets
+
+<!-- Classify every capability the prospect asked about:
+  IN CODE: built in this project
+  DAGSTER+: demonstrated in the UI, never implemented (alerting, restart from
+    failure, lineage UI, asset health, Issues, SSO, RBAC, run history)
+  CONVERSATION: mentioned only, no code (ticketing, webhook fan-out, roadmap)
+Getting this wrong costs either way — building platform features argues against
+us; claiming code for a conversation item oversells. -->
+
+## Demo name
+
+<!-- A short scenario title, e.g. "Crypto Portfolio Health", "Late Carrier
+Data". Goes in the README and the demo script. -->
 
 ## Money shot
 
