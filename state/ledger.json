@@ -1,15 +1,19 @@
 {
-  "brief-ready": [
+  "brief-ready": [],
+  "built": [
     {
       "company": "Kapitus",
       "slug": "kapitus",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-25-kapitus.md",
-      "timestamp": "2026-08-25T22:15:00Z"
-    }
-  ],
-  "built": [
+      "timestamp": "2026-08-25T22:15:00Z",
+      "deployed_at": "2026-08-26T06:33:00Z",
+      "location_name": "demo-kapitus",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/7",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-kapitus"
+    },
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
