@@ -1,20 +1,16 @@
 {
-  "brief-ready": [],
-  "built": [
+  "brief-ready": [
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
       "status": "brief-ready",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-26-stellantis-financial-services.md",
-      "timestamp": "2026-08-26T00:00:00Z",
-      "deployed_at": "2026-08-26T14:25:00Z",
-      "location_name": "demo-stellantis-financial-services",
-      "deployment": "prod",
-      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/8",
-      "note": "Rebuild of the requeued brief (Fabric trigger-and-observe over SSIS/Fabric pipelines, no dbt) after the 2026-08-25 dbt-based version was deleted and requeued.",
-      "reset_at": "2026-08-26T10:47:26"
-    },
+      "timestamp": "2026-08-26T15:00:00Z",
+      "note": "Second rewrite. Eric merged PR #8 (Fabric trigger-and-observe rebuild), then landed the stricter 'demos always work, no exception the brief can grant' house rule and cleared both the brief and the built project, since PR #8's money shot planted a failing check and recovered from it. This rewrite keeps the research and asset graph, replaces the planted-anomaly money shot with an all-green partition-scoped-rematerialization demo, and drops the custom dagster-msteams sensor in favor of Dagster+ native alert policies."
+    }
+  ],
+  "built": [
     {
       "company": "Kapitus",
       "slug": "kapitus",
