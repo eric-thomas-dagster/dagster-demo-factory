@@ -1,9 +1,0 @@
-{
-  "id": "cron_schedule",
-  "name": "CronSchedule",
-  "category": "infrastructure",
-  "ref": "main",
-  "version": "1.0.0",
-  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/schedules/cron_schedule/component.py",
-  "installed_at": "2026-08-26T16:31:18+00:00"
-}
