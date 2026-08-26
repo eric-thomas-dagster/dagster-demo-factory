@@ -636,6 +636,7 @@ in `LEARNINGS.md`.
 | `docs/POC-PLAYBOOK.md` | Rules for POC builds. Inverts several rules in this file. |
 | `pocs/<slug>/` | POC projects, when a standalone repo couldn't be created. |
 | `component-feedback/` | One file per registry gap, written whenever a build falls through to a custom component. |
+| `requests/` | **Drop a file here to tell the routines what to do.** Highest-priority signal; checked before the calendar or ledger. |
 | `briefs/` | One markdown brief per prospect. `_TEMPLATE.md` is the required shape. |
 | `demos/<slug>/` | Generated Dagster projects, one directory per prospect. |
 | `templates/demo_mode_pattern.py` | **Read before writing any demo component.** |
