@@ -27,20 +27,19 @@ re-verify. Hard cap ~100 lines.
 `./scripts/preflight_deploy.sh <slug>` checks all of these in ~20s.
 
 - `pex` installed and `dagster-cloud` a project dependency, or `--build-method
-  local` fails. `--package-name` is the module holding `Definitions`, not the
-  project dir name — verify with `python -c "import <pkg>"`.
+  local` fails. `--package-name` is the module holding `Definitions` — verify
+  with `python -c "import <pkg>"`.
 - `dbt_project/` must live **inside** the package dir, and dbt's
   `target/manifest.json` / `.local_defs_state/` must be force-included in
-  `[tool.hatch.build.targets.wheel]` — both are gitignored by default, and
-  gitignored files don't ship. Verify with `unzip -l dist/*.whl`.
+  `[tool.hatch.build.targets.wheel]` — both gitignored by default, so they
+  silently don't ship otherwise. Verify with `unzip -l dist/*.whl`.
 - Run `dg utils refresh-defs-state` before deploying state-backed components
-  (dbt, Fivetran), or the location fails to load remotely.
-- Activate the project venv before `dagster-cloud` deploy commands.
+  (dbt, Fivetran), or the location fails to load remotely. Activate the
+  project venv before any `dagster-cloud` command.
 - Agent sync after PEX upload takes several minutes — normal, use a blocking
   wait. Exit code 0 does **not** mean the location loaded — confirm with
-  `dg api`, look for `LOADED`.
-- Prefer `deploy-python-executable --build-method local` (PEX); `serverless
-  deploy` (Docker) is the fallback for source-only deps.
+  `dg api`, look for `LOADED`. Prefer `--build-method local` (PEX);
+  `serverless deploy` (Docker) is the fallback for source-only deps.
 
 ## Dagster+ Serverless runtime
 
@@ -56,15 +55,16 @@ re-verify. Hard cap ~100 lines.
 - `Definitions.resolve_implicit_job_def_def_for_assets(asset_keys)` — the
   doubled `def_def` is real, not a typo.
 - `dagster-component init` doesn't scaffold a project — run `create-dagster
-  project` first, then `init --auto-install --force`. Right after that
-  first install, `dg check defs` can transiently fail with a
-  `ModuleNotFoundError` even though `python -c "import <pkg>"` works in the
-  same venv — re-run it (or `--verbose`) and it passes; a stale plugin
-  manifest, not a real break.
+  project` first, then `init --auto-install --force`. Right after, `dg check
+  defs` can transiently fail with `ModuleNotFoundError` even though `python
+  -c "import <pkg>"` works — re-run it; stale plugin manifest, not a real
+  break.
 - `dg list defs --json` top-level keys are `assets` / `asset_checks` / `jobs`
   / `schedules` / `sensors`; each asset's key is `"asset_key"` (snake_case).
 - `dg.build_schedule_from_partitioned_job(...)` has no `timezone` kwarg — it
-  inherits the job's `partitions_def` timezone.
+  inherits the job's `partitions_def` timezone, and accepts a
+  `MultiPartitionsDefinition` job as long as one dimension is time-partitioned
+  (cron derives from that dimension automatically).
 
 ## APIs and schemas (dagster-dbt 0.29.19)
 
@@ -85,19 +85,26 @@ re-verify. Hard cap ~100 lines.
   | None)` (or `.cron(deadline_cron, lower_bound_delta, timezone)`) set on
   `AssetSpec.freshness_policy` is enough — Dagster computes PASS/WARN/FAIL
   itself, no separate check definition needed.
-- Jinja in `defs.yaml` can't do `AutomationCondition.eager() & other` or build
-  a `timedelta` inline — compose it in a `template_vars.py` sibling module as
-  an `@dg.template_var` function and reference it as `"{{ fn_name }}"`
-  (needs `template_vars_module: .template_vars` on the defs.yaml).
+- Jinja in `defs.yaml` can't do `AutomationCondition.eager() & other`, build a
+  `timedelta` inline, or construct a `MultiPartitionsDefinition` (its dict arg
+  isn't in the `dg` scope's supported set — see its docs for the exact list)
+  — compose any of these in a `template_vars.py` sibling module as an
+  `@dg.template_var` function and reference it as `"{{ fn_name }}"` (needs
+  `template_vars_module: .template_vars` on the defs.yaml).
+- On a `MultiPartitionsDefinition` asset, `context.partition_key` is a
+  `MultiPartitionKey`; read each dimension via
+  `partition_key.keys_by_dimension["dim_name"]` — works the same inside a
+  `@dg.multi_asset` and a `@dg.asset_check`.
 - `dagster_msteams.MSTeamsResource.hook_url` has no default — subclass with a
-  demo-safe placeholder and override `get_client()` for demo mode.
-  `make_teams_on_run_failure_sensor` builds its `TeamsClient` at fire time
-  (not definition time) and defaults `DefaultSensorStatus.STOPPED`, so it's
-  safe to define with a placeholder `hook_url` even in demo mode.
-- `dagster_azure.adls2.ADLS2Resource` requires `storage_account` +
-  `credential` (no defaults); its `adls2_client`/`blob_client` are
+  placeholder + override `get_client()`. `make_teams_on_run_failure_sensor`
+  builds its `TeamsClient` at fire time and defaults `STOPPED`, so it's safe
+  to define even in demo mode. Native `dg.run_failure_sensor` (no third-party
+  resource) is a fine fallback when the brief names no alerting channel.
+- `dagster_azure.adls2.ADLS2Resource`'s `adls2_client`/`blob_client` are
   `@cached_method` properties that eagerly authenticate on first access — a
-  demo-mode subclass must never touch them, not just discard the result.
+  demo-mode subclass must never touch them. `dagster_aws.s3.S3Resource` is
+  safer: `get_client()` is a plain method, only builds a boto3 client when
+  called, so a demo-mode subclass just skips calling it.
 
 ## Component-authoring gotchas
 
@@ -115,18 +122,17 @@ re-verify. Hard cap ~100 lines.
 ## Registry gaps (searched, ruled out for partitioned demo-mode ingestion)
 
 - No component supports a partitioned, demo-mode-fakeable "poll an inbound
-  vendor file" source. `dataframe_to_adls` / `fabric_lakehouse_*` are sinks
-  (write OUT to the lake); `adls_monitor` only detects new blobs, it doesn't
-  parse a vendor schema. `database_replication` (Sling) has no
-  `partitions_def`; `rest_api_fetcher`/`odata_ingestion` need a live endpoint.
-
-## Project config
-
-- `profiles.yml` needs a working default path with the env var as an
-  optional override: `{{ env_var('X_PATH', 'demo_data/demo.duckdb') }}`.
+  file/event" source, on Azure or AWS: `adls_monitor`/`s3_monitor`/
+  `sqs_monitor` poll a real bucket/queue with no demo-mode affordance;
+  `database_replication` (Sling) has no `partitions_def`; `rest_api_fetcher`/
+  `odata_ingestion` need a live endpoint; `fivetran_assets` keys by the
+  connector's own tables, not a custom partition. Custom `dg.Component`
+  subclass (rung 4) is the working pattern instead.
 
 ## Environment
 
+- `profiles.yml` needs a working default path with the env var as an
+  optional override: `{{ env_var('X_PATH', 'demo_data/demo.duckdb') }}`.
 - `GH_TOKEN` reads as literal `proxy-injected` when the GitHub proxy handles
   auth — treat as unset.
 - Gmail exposes `create_draft` but no send; draft + mobile push, never report
