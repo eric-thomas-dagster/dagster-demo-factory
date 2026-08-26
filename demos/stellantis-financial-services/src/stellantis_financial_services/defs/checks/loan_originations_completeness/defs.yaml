@@ -1,0 +1,17 @@
+type: stellantis_financial_services.components.DuckDbAssetCheckComponent
+attributes:
+  asset_key: raw_loan_originations
+  check_name: loan_originations_completeness
+  blocking: true
+  description: >
+    Required fields (loan_id, amount, dealer_id) are non-null before the
+    stg_loan_originations Fabric pipeline trigger runs. Maps to: "failure
+    recovery is manual, replay is weak" -- bad data structurally cannot
+    silently propagate into a downstream pipeline trigger.
+  sql: >
+    SELECT
+      (SUM(CASE WHEN loan_id IS NULL OR amount IS NULL OR dealer_id IS NULL THEN 1 ELSE 0 END) = 0) AS passed,
+      COUNT(*) AS row_count,
+      SUM(CASE WHEN loan_id IS NULL OR amount IS NULL OR dealer_id IS NULL THEN 1 ELSE 0 END) AS incomplete_rows
+    FROM bronze.raw_loan_originations
+    WHERE origination_date = '{date}'

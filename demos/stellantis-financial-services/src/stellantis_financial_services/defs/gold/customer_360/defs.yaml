@@ -1,0 +1,14 @@
+type: stellantis_financial_services.components.FabricPipelineAssetComponent
+attributes:
+  asset_key: customer_360
+  generator_key: customer_360
+  description: >
+    Borrower-level relationship rollup (active contracts, lifetime
+    originated amount) for the Customer Data Platform team, produced by
+    the pl_build_customer_360 Fabric pipeline.
+  group_name: gold
+  kinds: [fabric, azure]
+  pipeline_name: pl_build_customer_360
+  deps: [dim_borrower, fact_loan_portfolio]
+  partitions: daily
+  fabric_item_name: pl_build_customer_360

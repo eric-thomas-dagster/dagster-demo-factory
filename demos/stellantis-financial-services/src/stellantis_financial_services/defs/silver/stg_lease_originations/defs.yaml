@@ -1,0 +1,15 @@
+type: stellantis_financial_services.components.FabricPipelineAssetComponent
+attributes:
+  asset_key: stg_lease_originations
+  generator_key: stg_lease_originations
+  description: >
+    Conformed lease originations with residual percentage derived,
+    produced by the pl_stage_lease_originations Fabric pipeline.
+  group_name: silver
+  kinds: [fabric, azure]
+  pipeline_name: pl_stage_lease_originations
+  deps: [raw_lease_originations]
+  partitions: daily
+  dollar_metadata_column: msrp
+  automation_eager: true
+  fabric_item_name: pl_stage_lease_originations

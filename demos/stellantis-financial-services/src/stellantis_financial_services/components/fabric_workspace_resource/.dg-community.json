@@ -1,0 +1,9 @@
+{
+  "id": "fabric_workspace_resource",
+  "name": "Fabric Workspace Resource",
+  "category": "resource",
+  "ref": "main",
+  "version": "1.0.0",
+  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/resources/fabric_workspace_resource/component.py",
+  "installed_at": "2026-08-26T14:58:29+00:00"
+}
