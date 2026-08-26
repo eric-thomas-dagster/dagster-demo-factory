@@ -147,6 +147,40 @@ So:
 - **Say which mode each part of the demo runs in** in the README and the
   notification, so nobody discovers this on a shared screen.
 
+## The feature floor is Dagster capabilities, not a fixed toolchain
+
+Partitions, checks, freshness policies, automation conditions, metadata, and
+kinds are Dagster capabilities — build those every time. **Which tools appear in
+the demo comes entirely from the brief**, never from habit or from what's
+convenient to build.
+
+If the AE notes don't mention a tool, we don't assume it. No dbt unless they run
+dbt. No Snowflake unless they run Snowflake. Where the brief marks a stack layer
+`unknown`, prefer something generic over something specific-and-wrong.
+
+### Orchestrating existing workloads — a first-class demo shape
+
+Many prospects don't want new pipelines. They want Dagster to orchestrate and
+observe what they already run — Fabric pipelines and notebooks, Databricks jobs,
+Airflow DAGs, Synapse, stored procedures, cron. That is a *different demo* from
+building a transformation graph, and it's often the more compelling one because
+it's additive rather than a migration.
+
+For that shape, reach for:
+
+- **External assets / `AssetSpec`s** representing things Dagster didn't create,
+  so their existing estate appears in the lineage graph.
+- **Observable source assets** to report freshness on data Dagster doesn't
+  materialize.
+- **Pipes** for launching and streaming back from external compute.
+- **Trigger-and-observe components** — the registry has real coverage here.
+  Search it: `fabric_workspace`, `fabric_pipeline_trigger_job`,
+  `fabric_lakehouse_resource`, `fabric_lakehouse_io_manager`, plus ~66 Azure
+  and ~18 Databricks components. Don't build from scratch what already exists.
+
+The story is *"your existing jobs, now with lineage, checks, freshness, and
+declarative scheduling on top"* — not *"rewrite everything in Dagster."*
+
 ## Assets are idempotent — the source changes, not the asset
 
 Recovery is never an action inside Dagster. There is no "heal" step, no reset
@@ -194,11 +228,12 @@ all of this beats twenty showing none of it.
   At least one **blocking** severity, so downstream refuses to compute on bad
   input rather than computing something wrong. Warning-only checks reproduce
   the prospect's current situation with better styling and prove nothing.
-- **A real dbt project.** Actual dbt Core executing against DuckDB via
-  `dagster-dbt` — real models, real `schema.yml` tests, real generated
-  lineage. Do not mock dbt. Most prospects run dbt, its lineage is the most
-  legible thing in the UI, and simulated lineage collapses under a follow-up
-  question.
+- **A transformation layer built on whatever THEY use.** Not a default.
+  Read the brief: if they run dbt, build a real dbt project (actual dbt Core,
+  real `schema.yml` tests, real generated lineage — never mocked). If they run
+  Fabric notebooks, Databricks jobs, Synapse pipelines, stored procedures, or
+  bare Python, build *that*. A dbt demo for a shop that doesn't use dbt is the
+  confident-wrong-guess failure, and it's obvious in the room.
 - **Freshness policies.** On the assets a prospect would page someone about.
   This is the direct answer to "how would we know something broke."
 - **Automation conditions.** `AutomationCondition.eager()` on the assets that

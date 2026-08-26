@@ -76,9 +76,18 @@ these things out loud in a room. -->
 <!-- Name the assets. Group them into layers. Specify partitions and cadence
 matching their real world. Target 12–25 assets. -->
 
+## Demo shape
+
+<!-- build-a-pipeline | orchestrate-existing-workloads | both. If they mainly
+want Dagster over what they already run (Fabric, Databricks, Airflow, Synapse),
+say so — that changes the whole build toward external assets and
+trigger-and-observe rather than a transformation graph. -->
+
 ## Native integrations to use
 
-<!-- dagster-dbt, dagster-snowflake, dagster-fivetran, dagster-sling... -->
+<!-- ONLY tools named in the AE notes or evidenced publicly. Do not assume dbt
+or Snowflake. If a layer is unknown, say unknown — generic beats
+specific-and-wrong. -->
 
 ## Community components to search for
 
