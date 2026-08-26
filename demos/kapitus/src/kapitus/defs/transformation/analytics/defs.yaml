@@ -1,0 +1,22 @@
+type: kapitus.components.KapitusDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_analytics
+  select: "daily_funding_summary underwriting_decision_metrics"
+  translation:
+    group_name: analytics
+    partitions_def: "{{ multi_partitions_def }}"
+
+post_processing:
+  assets:
+    - target: "analytics/daily_funding_summary"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"
+    - target: "analytics/underwriting_decision_metrics"
+      attributes:
+        automation_condition: "{{ recompute_after_upstream_and_checks_pass }}"

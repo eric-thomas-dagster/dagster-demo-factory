@@ -1,0 +1,6 @@
+product_line,product_line_name,product_category,typical_term_months,typical_apr_range
+term_loan,Term Loan,installment,36,8-18%
+revenue_based_financing,Revenue-Based Financing,installment,12,20-50%
+equipment_financing,Equipment Financing,installment,48,7-16%
+sba_loan,SBA Loan,installment,84,8-13%
+line_of_credit,Line of Credit,revolving,,10-24%

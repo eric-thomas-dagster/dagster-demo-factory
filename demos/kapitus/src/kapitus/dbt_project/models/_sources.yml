@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: loan_applications
+        meta:
+          dagster:
+            asset_key: ["raw", "loan_applications"]
+      - name: bank_statement_data
+        meta:
+          dagster:
+            asset_key: ["raw", "bank_statement_data"]
+      - name: credit_bureau_pulls
+        meta:
+          dagster:
+            asset_key: ["raw", "credit_bureau_pulls"]

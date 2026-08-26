@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: daily_funding_summary
+    description: "Exec-facing rollup: total funding activity across every product line, one row per day."
+    columns:
+      - name: application_date
+        data_tests: [unique, not_null]
+
+  - name: underwriting_decision_metrics
+    description: "Funded vs. declined credit-score gap, one row per day."
+    columns:
+      - name: application_date
+        data_tests: [unique, not_null]

@@ -1,0 +1,8 @@
+type: kapitus.components.BronzeFeedComponent
+
+attributes:
+  feed: loan_applications
+  demo_mode: true
+  demo_seed: 20260825
+  landing:
+    demo_mode: true

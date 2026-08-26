@@ -1,0 +1,8 @@
+type: kapitus.components.BronzeFeedComponent
+
+attributes:
+  feed: credit_bureau_pulls
+  demo_mode: true
+  demo_seed: 20260825
+  landing:
+    demo_mode: true

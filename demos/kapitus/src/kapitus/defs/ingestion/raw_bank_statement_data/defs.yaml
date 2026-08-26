@@ -1,0 +1,8 @@
+type: kapitus.components.BronzeFeedComponent
+
+attributes:
+  feed: bank_statement_data
+  demo_mode: true
+  demo_seed: 20260825
+  landing:
+    demo_mode: true
