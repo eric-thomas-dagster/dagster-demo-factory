@@ -12,6 +12,13 @@
 # the Fabric lakehouse. Set demo_mode: false and fill in the workspace block
 # below to run against SFS's real Fabric workspace -- every asset key, spec,
 # partition, check, and the sensor stay identical.
+#
+# raw_dealer_floorplan_feed and raw_credit_bureau_pull are deliberately NOT
+# entries in this mapping table -- there is no Fabric pipeline behind either
+# one. SFS's own homegrown scheduler still runs those two as SSIS packages;
+# see defs/legacy_assets/legacy_assets.py for how Dagster observes (never
+# triggers) them, and dim_dealer / dim_borrower below for where the lineage
+# crosses from that legacy system into this migrated one.
 type: stellantis_financial_services.components.DemoFabricWorkspaceComponent
 attributes:
   # demo_mode never calls this workspace, so a placeholder ID is fine and no
@@ -84,43 +91,6 @@ attributes:
         domain: "collections"
         integration_pattern: "coexistence"
         legacy_system_boundary: "migrated_to_fabric"
-
-    raw_dealer_floorplan_feed:
-      key: [raw_dealer_floorplan_feed]
-      partitions: dealer_floorplan
-      group_name: bronze_ingestion
-      kinds: [fabric, azure]
-      owners: ["team:enterprise-data-management"]
-      description: "Per-region dealer floorplan financing feed -- the one bronze feed with a genuine second (dealer_group) partition dimension, since floorplan arrives per-region."
-      automation_eager: false
-      metadata:
-        owner: "Enterprise Data Management"
-        owner_team: "team:enterprise-data-management"
-        tier: "tier_2"
-        domain: "dealer_floorplan"
-        integration_pattern: "coexistence"
-        # This is one of the two packages the polling sensor observes as
-        # externally triggered -- still homegrown-scheduler-owned for the
-        # south region during the migration.
-        legacy_system_boundary: "homegrown_scheduler_owned"
-
-    raw_credit_bureau_pull:
-      key: [raw_credit_bureau_pull]
-      partitions: daily
-      group_name: bronze_ingestion
-      kinds: [fabric, azure]
-      owners: ["team:enterprise-data-management"]
-      description: "Daily commercial/consumer credit bureau pull for that day's loan and lease applicants."
-      automation_eager: false
-      metadata:
-        owner: "Enterprise Data Management"
-        owner_team: "team:enterprise-data-management"
-        tier: "tier_2"
-        domain: "credit_underwriting"
-        integration_pattern: "coexistence"
-        # The other package the polling sensor observes as externally
-        # triggered -- still owned by SFS's own scheduler.
-        legacy_system_boundary: "homegrown_scheduler_owned"
 
     stg_loan_originations:
       key: [stg_loan_originations]
@@ -199,7 +169,7 @@ attributes:
       group_name: silver_transformation
       kinds: [fabric, azure]
       owners: ["team:enterprise-data-management"]
-      description: "Dealer dimension -- rolls up all four dealer_group partitions of the floorplan feed for one date via a multi-to-single-dimension partition mapping."
+      description: "Dealer dimension -- fully Fabric-migrated, but its only input (raw_dealer_floorplan_feed) is still produced by SSIS under SFS's own scheduler today. Rolls up all four dealer_group partitions for one date via a multi-to-single-dimension partition mapping."
       automation_eager: true
       metadata:
         owner: "Enterprise Data Management"
@@ -216,7 +186,7 @@ attributes:
       group_name: silver_transformation
       kinds: [fabric, azure]
       owners: ["team:enterprise-data-management"]
-      description: "Borrower dimension joining conformed originations with the day's credit bureau pull."
+      description: "Borrower dimension -- fully Fabric-migrated, but one of its inputs (raw_credit_bureau_pull) is still produced by SSIS under SFS's own scheduler today. Joins conformed originations with the day's credit bureau pull."
       automation_eager: true
       metadata:
         owner: "Enterprise Data Management"

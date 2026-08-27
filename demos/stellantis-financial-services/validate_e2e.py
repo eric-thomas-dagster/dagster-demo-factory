@@ -2,15 +2,24 @@
 
 `dg launch --assets '*'` exits immediately on any partitioned asset ("Asset
 has partitions, but no '--partition' option was provided") -- every asset in
-this project is partitioned (16 on `date`, plus `raw_dealer_floorplan_feed` on
-`date` x `dealer_group`), so this script is the harness `scripts/validate_demo.sh`
-requires instead. It proves:
+this project is partitioned (15 Fabric-migrated assets on `date`, plus two
+legacy assets Dagster never materializes at all), so this script is the
+harness `scripts/validate_demo.sh` requires instead. It proves:
 
-1. The whole chain materializes cleanly across a validation window -- all
-   four dealer_group partitions of the floorplan feed, then the sixteen
-   date-partitioned bronze/silver/gold/reporting assets -- for every date in
-   the window, with all three asset checks passing.
-2. Row counts are printed so determinism is visible across runs.
+1. The two genuinely-legacy assets (`raw_dealer_floorplan_feed`,
+   `raw_credit_bureau_pull`) are never materialized by a Dagster run -- only
+   observed, via `legacy_scheduler_observer` -- and that the observation
+   sensor's `SensorResult.asset_events` land in the event log as real
+   `AssetObservation`s the same way the daemon would report them.
+2. The dealer floorplan lateness check runs and passes as part of that same
+   sensor tick (see `defs/checks/raw_dealer_floorplan_feed_lateness.py`'s
+   docstring for why it can't run via a standalone job in this Dagster
+   version), independent of any materialization.
+3. The fifteen Fabric-migrated assets materialize cleanly across a
+   validation window, including `dim_dealer` and `dim_borrower` -- the two
+   assets where lineage crosses from the legacy system into the migrated
+   one -- with the other two named asset checks passing.
+4. Row counts are printed so determinism is visible across runs.
 
 Per the brief and house rules, this demo runs green end-to-end -- there is no
 planted anomaly or recovery sequence to validate. The blocking and warning
@@ -28,16 +37,17 @@ import dagster as dg
 warnings.filterwarnings("ignore")
 
 from stellantis_financial_services.definitions import defs  # noqa: E402
+from stellantis_financial_services.defs.legacy_assets.legacy_assets import legacy_scheduler_observer  # noqa: E402
 from stellantis_financial_services.demo_data.generators import DEALER_GROUPS  # noqa: E402
 from stellantis_financial_services.demo_data.warehouse import connect_with_retry, demo_duckdb_path  # noqa: E402
+from stellantis_financial_services.partitions import DAILY_PARTITIONS  # noqa: E402
 
-FLOORPLAN_KEY = dg.AssetKey(["raw_dealer_floorplan_feed"])
+LEGACY_KEYS = {dg.AssetKey(["raw_dealer_floorplan_feed"]), dg.AssetKey(["raw_credit_bureau_pull"])}
 
 DAILY_KEYS = [
     dg.AssetKey(["raw_loan_originations"]),
     dg.AssetKey(["raw_lease_originations"]),
     dg.AssetKey(["raw_payment_transactions"]),
-    dg.AssetKey(["raw_credit_bureau_pull"]),
     dg.AssetKey(["stg_loan_originations"]),
     dg.AssetKey(["stg_lease_originations"]),
     dg.AssetKey(["stg_payment_transactions"]),
@@ -52,14 +62,13 @@ DAILY_KEYS = [
     dg.AssetKey(["powerbi_portfolio_dashboard_refresh"]),
 ]
 
-ALL_ASSET_COUNT = len(DAILY_KEYS) + 1  # + the floorplan feed
+ALL_ASSET_COUNT = len(DAILY_KEYS) + len(LEGACY_KEYS)  # 15 Fabric-migrated + 2 legacy
 
 VALIDATION_DATES = ["2026-08-20", "2026-08-21"]
 
 _CHECK_NAMES = (
     "raw_loan_originations_completeness",
     "abs_pool_eligibility_reconciliation",
-    "raw_dealer_floorplan_feed_lateness",
 )
 
 _failures: list[str] = []
@@ -101,29 +110,47 @@ def main() -> int:
     definitions = defs()
 
     with dg.instance_for_test() as instance:
+        print("\n[1/4] Legacy assets are never materialized -- only observed")
+        cursor = None
+        lateness_check_results: list[bool] = []
+        for _ in range(len(DEALER_GROUPS) + 1):  # one full rotation: 4 floorplan regions + credit bureau
+            context = dg.build_sensor_context(instance=instance, definitions=definitions, cursor=cursor)
+            data = legacy_scheduler_observer.evaluate_tick(context)
+            cursor = data.cursor
+            for event in data.asset_events:
+                instance.report_runless_asset_event(event)
+                if isinstance(event, dg.AssetObservation):
+                    check(
+                        event.asset_key in LEGACY_KEYS,
+                        f"legacy_scheduler_observer reported an AssetObservation for {event.asset_key}",
+                    )
+                elif isinstance(event, dg.AssetCheckEvaluation):
+                    lateness_check_results.append(event.passed)
+        latest_partition = DAILY_PARTITIONS.get_last_partition_key()
+        for key in LEGACY_KEYS:
+            materializations = instance.get_event_records(
+                dg.EventRecordsFilter(event_type=dg.DagsterEventType.ASSET_MATERIALIZATION, asset_key=key)
+            )
+            check(len(materializations) == 0, f"{key}: zero Dagster-triggered materializations, ever")
+            observations = instance.get_event_records(
+                dg.EventRecordsFilter(event_type=dg.DagsterEventType.ASSET_OBSERVATION, asset_key=key)
+            )
+            check(len(observations) > 0, f"{key}: at least one AssetObservation recorded (got {len(observations)})")
+
+        print(f"\n[2/4] Legacy check ran as part of the observation sensor's tick for {latest_partition}")
+        check(
+            len(lateness_check_results) == len(DEALER_GROUPS),
+            f"raw_dealer_floorplan_feed_lateness evaluated once per region (got {len(lateness_check_results)}/{len(DEALER_GROUPS)})",
+        )
+        check(all(lateness_check_results), f"raw_dealer_floorplan_feed_lateness passed for every region (results: {lateness_check_results})")
+
         print(
-            f"\n[1/2] Materializing the whole chain for {len(VALIDATION_DATES)} dates: "
-            f"{VALIDATION_DATES} ({ALL_ASSET_COUNT} assets/date, 4 dealer_group partitions of the floorplan feed)"
+            f"\n[3/4] Materializing the 15 Fabric-migrated assets for {len(VALIDATION_DATES)} dates: "
+            f"{VALIDATION_DATES}"
         )
         for event_date in VALIDATION_DATES:
-            observed_checks: dict[str, bool] = {}
-
-            # The floorplan feed is multi-partitioned (date x dealer_group) and
-            # dim_dealer depends on all four regions for the date, so land those
-            # four partitions first.
-            for dealer_group in DEALER_GROUPS:
-                partition_key = dg.MultiPartitionKey({"date": event_date, "dealer_group": dealer_group})
-                result = run(definitions, instance, [FLOORPLAN_KEY], partition_key=partition_key, label="floorplan")
-                for evaluation in result.get_asset_check_evaluations():
-                    observed_checks[evaluation.check_name] = evaluation.passed
-                missing = {FLOORPLAN_KEY} - materialized_keys(result)
-                check(not missing, f"{event_date}/{dealer_group}: raw_dealer_floorplan_feed materialized")
-
-            # Then the sixteen date-partitioned assets, including dim_dealer's
-            # roll-up of the four floorplan partitions just landed.
             result = run(definitions, instance, DAILY_KEYS, partition_key=event_date, label="daily chain")
-            for evaluation in result.get_asset_check_evaluations():
-                observed_checks[evaluation.check_name] = evaluation.passed
+            observed_checks = {e.check_name: e.passed for e in result.get_asset_check_evaluations()}
             missing = set(DAILY_KEYS) - materialized_keys(result)
             check(not missing, f"{event_date}: all {len(DAILY_KEYS)} date-partitioned assets materialized (missing: {missing or 'none'})")
 
@@ -131,13 +158,14 @@ def main() -> int:
                 passed = observed_checks.get(check_name)
                 check(passed is True, f"{event_date}: check '{check_name}' ran and passed (result: {passed})")
 
-        print(f"  materialized {len(VALIDATION_DATES)} dates x {ALL_ASSET_COUNT} assets, all checks green")
+        print(f"  materialized {len(VALIDATION_DATES)} dates x {len(DAILY_KEYS)} Fabric-migrated assets, all checks green")
 
-        print("\n[2/2] Row counts (determinism check)")
+        print("\n[4/4] Row counts (determinism check)")
         conn = connect_with_retry(demo_duckdb_path())
         try:
             loans = conn.execute("select count(*) from raw.raw_loan_originations").fetchone()[0]
             floorplan = conn.execute("select count(*) from raw.raw_dealer_floorplan_feed").fetchone()[0]
+            bureau = conn.execute("select count(*) from raw.raw_credit_bureau_pull").fetchone()[0]
             portfolio_rows = conn.execute("select count(*) from marts.fact_loan_portfolio").fetchone()[0]
             pool = conn.execute(
                 "select as_of_date, dealer_group, total_balance, eligible_balance, pool_eligible "
@@ -146,7 +174,8 @@ def main() -> int:
         finally:
             conn.close()
         print(f"\n  raw.raw_loan_originations total rows: {loans}")
-        print(f"  raw.raw_dealer_floorplan_feed total rows: {floorplan}")
+        print(f"  raw.raw_dealer_floorplan_feed total rows (legacy, SFS-scheduler-landed): {floorplan}")
+        print(f"  raw.raw_credit_bureau_pull total rows (legacy, SFS-scheduler-landed): {bureau}")
         print(f"  marts.fact_loan_portfolio total rows: {portfolio_rows}")
         print(f"  marts.abs_pool_eligibility (first 4 rows): {pool}")
 
@@ -157,8 +186,9 @@ def main() -> int:
             print(f"  - {failure}")
         return 1
     print(
-        "VALIDATION PASSED -- the full chain materializes green across every date in the validation "
-        "window, with all three asset checks passing on real, computed conditions."
+        f"VALIDATION PASSED -- all {ALL_ASSET_COUNT} assets are correct end to end: the 15 Fabric-migrated "
+        "assets materialize green across every date in the validation window, the 2 legacy assets are never "
+        "Dagster-materialized and only ever observed, and every asset check passes on real, computed conditions."
     )
     return 0
 

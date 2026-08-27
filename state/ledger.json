@@ -4,16 +4,16 @@
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-08-27-stellantis-financial-services.md",
       "timestamp": "2026-08-27T00:10:00Z",
-      "deployed_at": "2026-08-26T22:52:00Z",
+      "deployed_at": "2026-08-27T06:35:00Z",
       "location_name": "demo-stellantis-financial-services",
       "deployment": "prod",
-      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/11",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/12",
       "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-stellantis-financial-services",
-      "note": "Fifth rewrite, honouring requests/stellantis-financial-services.md (action: rebuild-brief): 'Focus on SSIS coexistence -- the last build ignored the legacy side entirely. Demo shape is migration-both-states.' Audited PR #11 (the 'deployed' build this entry describes below) directly: raw_dealer_floorplan_feed and raw_credit_bureau_pull were tagged legacy_system_boundary: homegrown_scheduler_owned in metadata only -- both were entries in the same fabric_workspace assets_by_item_name mapping table as every other asset, executed identically via the mocked Fabric trigger/poll API. No code path anywhere in the project let a legacy system, not Fabric, produce an asset's data. This rewrite changes Demo shape to migration-both-states explicitly: those two assets become genuine external AssetSpecs with no Fabric pipeline behind them, observed (never triggered) by a dedicated sensor over SFS's own mocked scheduler run log, and consumed downstream by two Fabric-migrated silver assets (dim_dealer, dim_borrower) -- so lineage now actually crosses from the legacy system into the migrated one, not just in a label. Research (AE doc, job postings, public signals) re-verified unchanged 2026-08-27 -- only the build directives changed. deployed_at/location_name/pr_url/dagster_plus_url above describe the now-superseded PR #11 build; Demo Factory needs a rebuild against this brief.",
+      "note": "Sixth build, against the fifth-rewrite brief's migration-both-states directive. raw_dealer_floorplan_feed and raw_credit_bureau_pull are now genuine external AssetSpecs with zero Dagster-owned compute (defs/legacy_assets/legacy_assets.py), observed -- never triggered -- by a dedicated legacy_scheduler_observer sensor, and consumed downstream by dim_dealer/dim_borrower, so lineage actually crosses the legacy/Fabric boundary in the graph, not just in a metadata label (the gap PR #11 had). validate_e2e.py proves zero Dagster-triggered materializations ever occur for the two legacy assets. 17 assets total (2 legacy, 15 Fabric-migrated); full validation gate green; verified zero-setup from a fresh clone.",
       "reset_at": "2026-08-26T17:47:35"
     },
     {

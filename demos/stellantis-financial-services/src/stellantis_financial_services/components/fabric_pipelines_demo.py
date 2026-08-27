@@ -61,16 +61,14 @@ from stellantis_financial_services.components.fabric_workspace.component import 
     FabricObjectProps,
     FabricWorkspaceComponent,
 )
-from stellantis_financial_services.demo_data import generators, transforms
+from stellantis_financial_services.demo_data import generators, legacy_scheduler, transforms
 from stellantis_financial_services.demo_data.external_run_history import EXTERNALLY_TRIGGERED_ITEMS
 from stellantis_financial_services.demo_data.warehouse import connect_with_retry, demo_duckdb_path, upsert_partition
-
-DAILY_PARTITIONS = dg.DailyPartitionsDefinition(start_date="2026-06-01")
-DEALER_GROUP_PARTITIONS = dg.StaticPartitionsDefinition(generators.DEALER_GROUPS)
-DEALER_FEED_PARTITIONS = dg.MultiPartitionsDefinition(
-    {"date": DAILY_PARTITIONS, "dealer_group": DEALER_GROUP_PARTITIONS}
+from stellantis_financial_services.partitions import (
+    DAILY_PARTITIONS,
+    DEALER_FEED_PARTITIONS,
+    DEALER_GROUP_ROLLUP_MAPPING,
 )
-DEALER_GROUP_ROLLUP_MAPPING = dg.MultiToSingleDimensionPartitionMapping(partition_dimension_name="dealer_group")
 
 _PARTITIONS_BY_NAME: dict[Optional[str], Any] = {
     None: None,
@@ -121,50 +119,41 @@ def _h_raw_payment_transactions(conn, event_date, seed, dealer_group):
     return len(frame)
 
 
-def _h_raw_dealer_floorplan_feed(conn, event_date, seed, dealer_group):
-    frame = generators.generate_dealer_floorplan_feed_frame(event_date, dealer_group, seed)
-    upsert_partition(
-        conn, "raw", "raw_dealer_floorplan_feed", frame,
-        {"feed_date": event_date, "dealer_group": dealer_group},
-        ddl_columns={
-            "dealer_id": "VARCHAR", "dealer_group": "VARCHAR", "feed_date": "VARCHAR",
-            "units_floored": "BIGINT", "floorplan_balance": "DOUBLE",
-            "curtailment_due_amount": "DOUBLE", "arrival_hour": "BIGINT",
-        },
-    )
-    return len(frame)
-
-
-def _h_raw_credit_bureau_pull(conn, event_date, seed, dealer_group):
-    frame = generators.generate_credit_bureau_pull_frame(event_date, seed)
-    upsert_partition(
-        conn, "raw", "raw_credit_bureau_pull", frame, {"pull_date": event_date},
-        ddl_columns={
-            "pull_id": "VARCHAR", "borrower_id": "VARCHAR", "bureau_name": "VARCHAR",
-            "pull_date": "VARCHAR", "credit_score": "BIGINT",
-        },
-    )
-    return len(frame)
-
-
 # --- silver/gold/reporting: SQL transforms over already-landed tables ---
 
 def _ignore_seed_and_dealer_group(fn):
     return lambda conn, event_date, seed, dealer_group: fn(conn, event_date)
 
 
+def _h_dim_dealer(conn, event_date, seed, dealer_group):
+    """dim_dealer rolls up all four dealer_group partitions of the still-
+    legacy floorplan feed for one date -- the boundary crossing itself. This
+    is where the demo needs the legacy system's shared storage to actually
+    have data, the same way it would read a shared lakehouse table in
+    production regardless of which system landed it (see
+    `demo_data/legacy_scheduler.py`)."""
+    for group in generators.DEALER_GROUPS:
+        legacy_scheduler.ensure_legacy_data_landed(conn, "raw_dealer_floorplan_feed", event_date, group)
+    return transforms.dim_dealer(conn, event_date)
+
+
+def _h_dim_borrower(conn, event_date, seed, dealer_group):
+    """dim_borrower joins conformed originations against the still-legacy
+    credit bureau pull -- the second boundary crossing."""
+    legacy_scheduler.ensure_legacy_data_landed(conn, "raw_credit_bureau_pull", event_date)
+    return transforms.dim_borrower(conn, event_date)
+
+
 _HANDLERS = {
     "raw_loan_originations": _h_raw_loan_originations,
     "raw_lease_originations": _h_raw_lease_originations,
     "raw_payment_transactions": _h_raw_payment_transactions,
-    "raw_dealer_floorplan_feed": _h_raw_dealer_floorplan_feed,
-    "raw_credit_bureau_pull": _h_raw_credit_bureau_pull,
     "stg_loan_originations": _ignore_seed_and_dealer_group(transforms.stg_loan_originations),
     "stg_lease_originations": _ignore_seed_and_dealer_group(transforms.stg_lease_originations),
     "stg_payment_transactions": _ignore_seed_and_dealer_group(transforms.stg_payment_transactions),
     "stg_delinquency_events": _ignore_seed_and_dealer_group(transforms.stg_delinquency_events),
-    "dim_dealer": _ignore_seed_and_dealer_group(transforms.dim_dealer),
-    "dim_borrower": _ignore_seed_and_dealer_group(transforms.dim_borrower),
+    "dim_dealer": _h_dim_dealer,
+    "dim_borrower": _h_dim_borrower,
     "fact_loan_portfolio": _ignore_seed_and_dealer_group(transforms.fact_loan_portfolio),
     "fact_delinquency_snapshot": _ignore_seed_and_dealer_group(transforms.fact_delinquency_snapshot),
     "abs_pool_eligibility": _ignore_seed_and_dealer_group(transforms.abs_pool_eligibility),
