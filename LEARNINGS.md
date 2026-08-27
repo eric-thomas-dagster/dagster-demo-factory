@@ -136,6 +136,16 @@ instead of discovering them one deploy cycle at a time.
   of through a dedicated job. (dagster==1.13.19, confirmed by reading
   `_infer_and_validate_common_partitions_def` in
   `dagster/_core/definitions/assets/job/asset_job.py`; 2026-08-27)
+- **State-backed components need `dg check defs` (or `dg dev`) to run at
+  least once before their assets exist** — `.local_defs_state/` is
+  gitignored, and a raw Python import of `definitions.py` (as
+  `validate_e2e.py` does) does not auto-compute it the way `dg`'s own CLI
+  commands do. `scripts/validate_demo.sh` already runs `dg check defs` before
+  `validate_e2e.py`, so the gate script is fine as-is — but running
+  `python validate_e2e.py` standalone on a truly fresh clone fails on the
+  first invocation with a confusing "AssetKey(s) [...] were selected, but no
+  AssetsDefinition objects supply these keys" until `dg check defs` runs
+  once. Verified 2026-08-27 by testing a fresh clone both ways.
 - `SensorDefinition.evaluate_tick(context)` (context from
   `dg.build_sensor_context(instance=..., definitions=..., cursor=...)`)
   returns a `SensorExecutionData` with `.asset_events` and `.cursor` — the
