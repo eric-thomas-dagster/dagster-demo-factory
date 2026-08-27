@@ -4,16 +4,16 @@
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
-      "status": "deployed",
+      "status": "brief-ready",
       "demo_date": "TBD",
-      "brief_path": "briefs/2026-08-26-stellantis-financial-services.md",
-      "timestamp": "2026-08-26T21:50:00Z",
+      "brief_path": "briefs/2026-08-27-stellantis-financial-services.md",
+      "timestamp": "2026-08-27T00:10:00Z",
       "deployed_at": "2026-08-26T22:52:00Z",
       "location_name": "demo-stellantis-financial-services",
       "deployment": "prod",
       "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/11",
       "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-stellantis-financial-services",
-      "note": "Fifth build (fourth rewrite's brief). Root cause of the prior three failures: fabric_workspace's polling_sensor field is declared but StateBackedComponent.build_defs never builds a sensor from it (verified by reading both sources in full) -- generate_sensor: true was always a no-op regardless of which build set it. DemoFabricWorkspaceComponent builds the SensorDefinition itself, gated on the same field. Also: deploy must use --module-name '<pkg>.definitions', not --package-name '<pkg>' -- this project's definitions.py is not re-exported from __init__.py (matches Kapitus/ISO NE's own layout), so the first manual deploy attempt (bypassing scripts/deploy_demo.sh) failed to load with 'No Definitions ... found'; scripts/deploy_demo.sh already had this right. Deleted the failed location before redeploying via the script.",
+      "note": "Fifth rewrite, honouring requests/stellantis-financial-services.md (action: rebuild-brief): 'Focus on SSIS coexistence -- the last build ignored the legacy side entirely. Demo shape is migration-both-states.' Audited PR #11 (the 'deployed' build this entry describes below) directly: raw_dealer_floorplan_feed and raw_credit_bureau_pull were tagged legacy_system_boundary: homegrown_scheduler_owned in metadata only -- both were entries in the same fabric_workspace assets_by_item_name mapping table as every other asset, executed identically via the mocked Fabric trigger/poll API. No code path anywhere in the project let a legacy system, not Fabric, produce an asset's data. This rewrite changes Demo shape to migration-both-states explicitly: those two assets become genuine external AssetSpecs with no Fabric pipeline behind them, observed (never triggered) by a dedicated sensor over SFS's own mocked scheduler run log, and consumed downstream by two Fabric-migrated silver assets (dim_dealer, dim_borrower) -- so lineage now actually crosses from the legacy system into the migrated one, not just in a label. Research (AE doc, job postings, public signals) re-verified unchanged 2026-08-27 -- only the build directives changed. deployed_at/location_name/pr_url/dagster_plus_url above describe the now-superseded PR #11 build; Demo Factory needs a rebuild against this brief.",
       "reset_at": "2026-08-26T17:47:35"
     },
     {
