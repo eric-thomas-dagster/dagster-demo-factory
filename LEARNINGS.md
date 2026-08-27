@@ -54,14 +54,11 @@ instead of discovering them one deploy cycle at a time.
 - Agent sync after PEX upload routinely takes several minutes. Normal, not a
   hang.
 - **Run the deploy in the FOREGROUND via `./scripts/deploy_demo.sh`** and let it
-  block — it polls to a terminal state internally. Backgrounding it and then
-  managing the background task is what burned ~12 turns on "waiting for the
-  monitor" in the 2026-08-26 run: a Monitor, a fallback wakeup, and manual
-  polling all doing the job the script already does. Sequence the deploy last,
-  after the retro and notification draft. (2026-08-26)
+  block — it polls to a terminal state internally. Backgrounding it and
+  managing the task separately just re-implements the wait the script already
+  does. Sequence the deploy last, after the retro and notification draft.
 - **Never hand-roll the `dagster-cloud` command.** The script carries the
-  correct flags, the LOADED loop, and partial-failure cleanup. A hand-built
-  invocation with the wrong flag cost a full deploy cycle on 2026-08-26.
+  correct flags, the LOADED loop, and partial-failure cleanup.
 - Exit code 0 from deploy does **not** mean the location loaded. Confirm with
   `dg api` and look for `LOADED`.
 - `LOADED` means the definitions parsed. It does **not** mean assets
@@ -114,21 +111,43 @@ instead of discovering them one deploy cycle at a time.
 - `components/__init__.py` must re-export each component class, or the UI
   Components tab won't list them even when `dg list components` does.
 
+- **Declaring a bare `dg.AssetSpec` (not wrapped in `@asset`) in
+  `Definitions(assets=[...])` is how you get a real external/observed-only
+  asset** — no `external_asset_from_spec` function exists (checked `dir(dg)`,
+  dagster==1.13.19). `Definitions._canonicalize_specs_to_assets_defs` wraps
+  bare specs into an `AssetsDefinition(specs=specs)` with zero compute; its
+  materialization history is then only ever `AssetObservation`/
+  `AssetCheckEvaluation` events reported via
+  `instance.report_runless_asset_event(event)` (exactly what a sensor's
+  `SensorResult.asset_events` becomes when the daemon runs it — same call
+  works standalone for testing). (verified 2026-08-27)
+- **A checks-only job over a non-executable asset can't get a
+  `PartitionsDefinition`, even if you pass one explicitly.**
+  `AssetSelection.checks_for_assets(key)` + `define_asset_job(...,
+  partitions_def=X)` silently drops `X` on resolution:
+  `build_asset_job`'s `_infer_and_validate_common_partitions_def` only looks
+  at `asset_graph.executable_asset_keys`, which is empty when the job selects
+  checks on a bare-`AssetSpec` (external) asset, so it returns `None`
+  regardless of what was passed in — `execute_in_process(partition_key=...)`
+  then fails with "There is no PartitionsDefinition shared by all the
+  provided assets". No fix at the YAML/config level; the check has to be
+  evaluated directly (call the check function, wrap the result as an
+  `AssetCheckEvaluation`, report it via `report_runless_asset_event`) instead
+  of through a dedicated job. (dagster==1.13.19, confirmed by reading
+  `_infer_and_validate_common_partitions_def` in
+  `dagster/_core/definitions/assets/job/asset_job.py`; 2026-08-27)
+- `SensorDefinition.evaluate_tick(context)` (context from
+  `dg.build_sensor_context(instance=..., definitions=..., cursor=...)`)
+  returns a `SensorExecutionData` with `.asset_events` and `.cursor` — the
+  way to unit-test a sensor's logic without running the daemon. Cursor must
+  be threaded manually between calls (`cursor=data.cursor` each tick) or the
+  sensor never advances past its first rotation item. (verified 2026-08-27)
+
 ## Project config
 
 - `profiles.yml` needs a **working default path** with the env var as an
   optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
   Requiring it with no fallback ships a demo that won't start.
-
-## Build sequencing that works
-
-## Connector quirks
-
-- **Drive search only returns Google-native files.** Docs/Sheets/Slides are
-  searchable; PDFs, DOCX, XLSX, PPTX are not, even though Drive indexes them.
-  Use the recent-files listing (returns metadata for all types) alongside
-  search, then read the file directly — *reading* PDFs and Office files works,
-  only search is blind to them. (2026-08-26)
 
 ## Environment
 
@@ -142,11 +161,10 @@ instead of discovering them one deploy cycle at a time.
 
 ## Registry behaviour and conventions
 
-- **Never assert a registry gap without searching.** A 2026-08-26 run wrote a
-  custom cron-schedule component stating "nothing to search the registry for" —
-  `cron_schedule` exists. The registry includes thin wrappers over core Dagster
-  calls, so "this is core Dagster" is not evidence of absence. Search, always,
-  with `--json`. (2026-08-26)
+- **Never assert a registry gap without searching.** The registry includes
+  thin wrappers over core Dagster calls (e.g. `cron_schedule`), so "this is
+  core Dagster" is not evidence of absence. Search, always, with `--json`.
+  (2026-08-26)
 - Use the **workspace-style** component with an explicit mapping table in
   `defs.yaml`, not one instance per external object. Reference:
   `github.com/eric-thomas-dagster/databricks-workspace-bundles-demo`
@@ -176,19 +194,9 @@ instead of discovering them one deploy cycle at a time.
   inside a job definition. (2026-08-26)
 
 - **Verify each feature-floor item actually appears in `dg list defs --json`.**
-  A component declaring a config field does not mean it builds anything from it
-  — a registry component with a `polling_sensor` field that never wired a sensor
-  silently sank three consecutive builds. Confirm presence in the definitions
-  listing; don't assume the component honoured its own config. (2026-08-26)
+  A component declaring a config field does not mean it builds anything from
+  it. Confirm presence in the definitions listing; don't assume the component
+  honoured its own config. (2026-08-26)
 - Read the most recent successful project in `demos/` for established
   conventions (warehouse setup, check style, README shape) before inventing your
   own. Cheap, and it keeps builds consistent. (2026-08-26)
-
-## Dead ends
-
-- **Never plant a failure in a demo.** No anomalies, corrupt partitions, or
-  missing data — not behind a flag. A demo that can fail will fail live, on the
-  path nobody rehearsed. Build the checks and explain what they'd catch in
-  production, against a green graph. Corollary: nothing to heal, so no heal
-  asset, heal job, or reset object; a disconnected `healed_partitions` node
-  reads as scaffolding. Briefs cannot override this. (2026-08-25)

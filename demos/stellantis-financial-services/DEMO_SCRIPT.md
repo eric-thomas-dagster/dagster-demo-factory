@@ -6,34 +6,65 @@ ephemeral, so treat the deployed code location as proof the project is real,
 not as the place to run this sequence (see README's "Local vs. Dagster+").
 
 Start with `dg dev` open to http://localhost:3000, Assets → all assets,
-grouped view.
+grouped view. Before the room arrives, open Sensors and turn on both
+`legacy_scheduler_observer` and `fabric_pipelines_external_run_observer` (or
+click "Test sensor" on each once) so step 5 has observation history to show
+rather than an empty timeline.
 
 ## 1. Orient on the graph (60s)
 
 Point at the full graph: bronze (vendor-file ingestion) → silver
-(conforming) → gold (marts) → reporting, with `fabric` / `azure` / `powerbi`
-kind badges throughout.
+(conforming) → gold (marts) → reporting. Two assets in bronze --
+`raw_dealer_floorplan_feed` and `raw_credit_bureau_pull` -- carry a visibly
+different kind badge (`azure` alone) from everything else (`fabric` +
+`azure`).
 
 **Say:** "This is your vendor-file-to-ABS-pool flow -- loan and lease
 originations, payments, dealer floorplan, credit bureau, all the way through
-to the ABS pool eligibility number your capital markets team needs. Every
-one of these is a Fabric pipeline that already exists, or is being migrated
-right now. Dagster isn't recomputing this logic in a new engine -- it's
-triggering, tracking, and gating the pipelines you're already building."
+to the ABS pool eligibility number your capital markets team needs. Most of
+this is already running on Fabric, or is being migrated right now. But two
+of these feeds -- right here -- are still running exactly as they do today,
+on your own SSIS packages, under your own scheduler. Both halves are in this
+one graph, at the same time, because that's actually where you are."
 
-## 2. One component, one mapping table (60s)
+## 2. THE MONEY SHOT -- the boundary crossing (2 min, don't rush this one)
+
+Click `dim_dealer`. Point at its one upstream dependency,
+`raw_dealer_floorplan_feed`. Open `raw_dealer_floorplan_feed`'s
+materialization history / event log.
+
+**Say:** "`dim_dealer` is 100% built and running on Fabric -- Dagster
+triggers it, tracks it, gates it. But look at what feeds it: every event in
+this asset's history is an `AssetObservation`, never a Dagster-triggered run.
+That's because there's no Fabric pipeline behind this feed at all. Your own
+scheduler runs this SSIS package today, and Dagster never touches it -- it
+only learns, the moment your scheduler finishes, that the data landed. Both
+are already in the same graph, right now, with the same freshness tracking,
+not after the migration finishes."
+
+Repeat briefly for `dim_borrower` → `raw_credit_bureau_pull` (a second,
+independent boundary crossing -- credit bureau, not dealer floorplan).
+
+**Say:** "This is the actual answer to 'can Dagster sit across a migration
+that isn't finished' -- not a label in a metadata field, a real second
+system feeding a real Dagster-triggered asset."
+
+## 3. One component, one mapping table (60s)
 
 Open `src/stellantis_financial_services/defs/fabric_pipelines/defs.yaml`.
 Scroll to `assets_by_item_name`.
 
-**Say:** "This whole graph -- all 17 assets -- comes from one component
-instance and this mapping table. Your 30th migrated package, or your 700th,
-is one more entry here. Not a new Python class, not a new component
-instance. That's the scaling story."
+**Say:** "Every Fabric-migrated asset -- 15 of them -- comes from one
+component instance and this mapping table. Your 30th migrated package, or
+your 700th, is one more entry here. Not a new Python class, not a new
+component instance. And when one of the two feeds you just saw finally cuts
+over, it gains a second entry here -- nothing about its identity in the graph
+changes, it just gains a Dagster-triggered execution path alongside the
+observation it already has."
 
-## 3. Everything's green, checks included (90s)
+## 4. Everything's green, checks included (90s)
 
-Click into `abs_pool_eligibility`. Show the Checks tab: both checks green.
+Click into `abs_pool_eligibility`. Show the Checks tab: green.
 
 **Say:** "This is your money-shot asset -- it feeds directly into your 2026
 ABS securitization calendar. This blocking check reconciles eligible balance
@@ -45,55 +76,38 @@ before anything downstream computes on a bad number."
 Click into `raw_loan_originations`, show its blocking completeness check.
 
 **Say:** "Same story upstream -- a loan record missing its ID or dealer or
-amount structurally cannot reach staging. That's your 'failure recovery is
-manual' problem solved structurally, not by hoping someone notices."
+amount structurally cannot reach staging."
 
-## 4. Freshness (30s)
+Click into `raw_dealer_floorplan_feed`'s Checks tab -- the lateness warning
+check, also green.
+
+**Say:** "And this check runs even though we never triggered this asset --
+the same sensor that tells us your scheduler finished also evaluates whether
+it finished on time. You get lateness visibility on a feed you haven't
+migrated yet."
+
+## 5. Freshness (30s)
 
 Click `fact_delinquency_snapshot`, point at the Freshness tab (6h fail / 3h
 warn).
 
 **Say:** "This is your SLA tracking and lateness visibility -- declared once
-on the asset, no custom dashboard. This is what pages someone when your
-delinquency numbers go stale."
+on the asset, no custom dashboard. It pages someone when your delinquency
+numbers go stale, whether the upstream data came from Fabric or from the
+system you're leaving."
 
-## 5. THE MONEY SHOT -- targeted rematerialization (90s)
+## 6. Targeted rematerialization (60s)
 
-In the UI, select just `raw_dealer_floorplan_feed`, partition `south` /
-today. Materialize.
+In the UI, select just `raw_loan_originations`, today's partition.
+Materialize.
 
 **Say, while it runs (seconds):** "Watch this -- I'm rematerializing one
-region's one day. Not the other three regions, not the other 699 packages'
-worth of pipeline behind this graph. This is what replay and backfill look
-like day to day: targeted, fast, and it doesn't touch anything it doesn't
-need to. Whether you're backfilling a schema change, reprocessing after an
-upstream fix, or just an operator's judgment call -- same mechanism, every
-time."
-
-Show it complete, then click `dim_dealer` and point out it's ready to
-recompute (declarative automation would pick it up automatically outside
-this manual demo click).
-
-**Say:** "And once corrected data lands, everything downstream that depends
-on it recomputes on its own -- that's `AutomationCondition.eager()`, not a
+day's originations. This is what replay and backfill look like day to day:
+targeted, fast. Whether you're backfilling a schema change, reprocessing
+after an upstream fix, or just an operator's judgment call -- same mechanism,
+every time. And once it lands, everything downstream that depends on it
+recomputes on its own -- that's `AutomationCondition.eager()`, not a
 schedule you have to remember to fire."
-
-## 6. THE COEXISTENCE MOMENT (60s) -- don't skip this one
-
-Navigate to `raw_credit_bureau_pull` or `raw_dealer_floorplan_feed` (south
-partition). Point at the latest event in its timeline -- an `AssetObservation`
-with `fabric/triggered_by` metadata reading "SFS homegrown scheduler" or
-"Operator ran the Fabric pipeline by hand mid-migration."
-
-If the sensor hasn't ticked yet, open Sensors → `fabric_pipelines_external_run_observer`
-and click "Test sensor" (or wait for its 30s interval) before this step.
-
-**Say:** "This is the answer to the question you're actually evaluating --
-what happens when it wasn't Dagster that started it? Your own scheduler is
-still going to trigger some of these 700 packages during the migration. When
-it does, it shows up right here, in the same lineage graph, with the same
-freshness tracking, as anything Dagster itself triggered. You are not being
-asked to route everything through us on day one."
 
 ## 7. Point at Dagster+ (30s -- can be screenshots if not live)
 
@@ -105,10 +119,13 @@ violations -- no custom sensor code for your team to own and maintain."
 
 ## 8. Close (30s)
 
-**Say:** "Dagster sits on top of what you're building in Fabric today. It
-gives you the visibility your homegrown layer can't, and it doesn't ask you
-to rebuild anything or cut over all at once. Your 700th package -- or your
-30th under Dagster -- is one more row in a table."
+**Say:** "Half your portfolio's data is still coming from the system you're
+leaving today, and it's already in the same lineage graph, with the same
+freshness tracking, as the half you've moved. You don't have to finish this
+migration to get value from Dagster, and you don't have to route everything
+through us on day one. Your 700th package -- or your 30th under Dagster --
+is one more row in a table, and until it's added, that package's data still
+shows up right here, from the system it's actually running on."
 
 ---
 
@@ -118,3 +135,12 @@ freshness policies you just saw are exactly what catches this in production
 -- we'd rather show you they're real and correctly wired than stage
 something breaking and recovering, which teaches you less about how this
 actually behaves under a real failure."
+
+**If asked "which packages are actually still on SSIS today":** "We picked
+dealer floorplan and credit bureau as the representative example -- both are
+third-party-integration-heavy feeds, a plausible last-to-migrate pair, but
+that's our assumption for the demo, not something your AE confirmed with
+you. The real question is whether the pattern generalizes to whichever
+packages you actually have left, and it does -- it's the same external-asset
+plus observation-sensor shape regardless of which two (or 683) packages
+haven't cut over yet."
