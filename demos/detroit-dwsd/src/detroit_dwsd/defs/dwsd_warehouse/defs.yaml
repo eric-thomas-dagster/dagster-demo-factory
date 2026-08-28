@@ -1,0 +1,80 @@
+type: detroit_dwsd.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: dim_customer_account
+      deps: ["billing_system_extract"]
+      group_name: dwsd_warehouse
+      owners: ["team:dwsd-integrations"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Curated customer/account dimension -- the record every billing and
+        reporting asset joins against.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "billing"
+
+    - key: fact_meter_reads
+      deps: ["meter_reading_extract"]
+      group_name: dwsd_warehouse
+      owners: ["team:dwsd-integrations"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Curated, per-meter daily read fact -- one node with visible
+        upstream/downstream in place of the T-SQL that moves this today.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "metering"
+
+    - key: fact_billing_usage
+      deps: ["dim_customer_account", "fact_meter_reads"]
+      group_name: dwsd_warehouse
+      owners: ["team:dwsd-integrations"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Billed usage by account, reconciled against raw meter reads -- the
+        record `billing_accuracy_report` checks itself against.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "billing"
+        business_impact: "Directly determines what a resident is billed."
+
+    - key: water_quality_compliance_daily
+      deps: ["water_quality_lab_extract"]
+      group_name: dwsd_warehouse
+      owners: ["team:dwsd-integrations"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      freshness_policy: "{{ dg.FreshnessPolicy.time_window(fail_window=datetime.timedelta(hours=26), warn_window=datetime.timedelta(hours=20)) }}"
+      description: >-
+        Daily compliance rollup of water-quality lab readings -- the money
+        shot: green, checked, and fresh, feeding the regulator-facing
+        extract downstream.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "water_quality"
+        severity: "high"
+        business_impact: >-
+          Late or incomplete data here means a late or inaccurate EPA
+          Safe Drinking Water Act filing.
+
+    - key: work_order_status
+      deps: ["work_order_extract"]
+      group_name: dwsd_warehouse
+      owners: ["team:dwsd-integrations"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: "Curated work-order status, joined for asset-maintenance reporting."
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_2"
+        domain: "asset_maintenance"

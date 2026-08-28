@@ -1,0 +1,69 @@
+type: detroit_dwsd.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: billing_system_extract
+      group_name: dwsd_ingestion
+      kinds: ["sqlserver"]
+      owners: ["team:dwsd-integrations"]
+      description: >-
+        Customer billing / CIS extract -- the kind of point-to-point,
+        hand-coded T-SQL integration DWSD's own posting describes.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "billing"
+        business_impact: >-
+          Feeds every downstream billing figure -- an error here surfaces
+          as a resident's incorrect water bill.
+
+    - key: meter_reading_extract
+      group_name: dwsd_ingestion
+      kinds: ["oracle"]
+      owners: ["team:dwsd-integrations"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Daily AMI/smart-meter read feed -- the "high frequency data loads"
+        the DWSD posting names as needing optimization.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "metering"
+        sla: "Full day's reads expected landed by 6:00 AM ET the following day."
+        business_impact: >-
+          Drives both billing accuracy and leak/outage detection -- the
+          asset that earns a partition because it arrives daily, per-meter.
+
+    - key: work_order_extract
+      group_name: dwsd_ingestion
+      kinds: ["sqlserver"]
+      owners: ["team:dwsd-integrations"]
+      description: >-
+        Work order / asset maintenance system extract -- one of the
+        "purchased package environments" the posting names.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_2"
+        domain: "asset_maintenance"
+
+    - key: water_quality_lab_extract
+      group_name: dwsd_ingestion
+      kinds: ["oracle"]
+      owners: ["team:dwsd-integrations"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Water-quality lab system extract -- the readings that (per industry
+        norm for a US water utility) roll up into Safe Drinking Water Act
+        compliance reporting.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "water_quality"
+        sla: "Required readings expected landed before the nightly compliance rollup."
+        business_impact: >-
+          Missing or incomplete lab readings block an accurate EPA
+          compliance filing.

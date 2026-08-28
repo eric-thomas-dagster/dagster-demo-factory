@@ -1,0 +1,37 @@
+type: detroit_dwsd.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: billing_accuracy_report
+      deps: ["fact_billing_usage"]
+      group_name: dwsd_reporting
+      owners: ["team:dwsd-integrations"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      freshness_policy: "{{ dg.FreshnessPolicy.time_window(fail_window=datetime.timedelta(hours=30), warn_window=datetime.timedelta(hours=24)) }}"
+      description: >-
+        Reconciliation report of billed usage vs. raw meter delta -- the
+        artifact that answers "which job touched this and did it pass."
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "billing"
+        business_impact: "Read by billing ops when a resident disputes a bill."
+
+    - key: compliance_reporting_extract
+      deps: ["water_quality_compliance_daily"]
+      group_name: dwsd_reporting
+      owners: ["team:dwsd-integrations"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ recompute_after_upstream_checks_pass }}"
+      description: >-
+        The extract that would go to a regulator -- gated on its upstream
+        blocking check so it never rebuilds off an incomplete compliance
+        rollup.
+      metadata:
+        owner: "DWSD Integrations"
+        owner_team: "team:dwsd-integrations"
+        tier: "tier_1"
+        domain: "water_quality"
+        severity: "high"
+        business_impact: "This is the artifact that would ship to the regulator."
