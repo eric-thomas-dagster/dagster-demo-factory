@@ -1,15 +1,20 @@
 {
-  "brief-ready": [
+  "brief-ready": [],
+  "built": [
     {
       "company": "City of Detroit — Water & Sewerage Department (DWSD)",
       "slug": "detroit-dwsd",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "2026-08-28",
       "brief_path": "briefs/2026-08-28-detroit-dwsd.md",
-      "timestamp": "2026-08-27T22:45:00Z"
-    }
-  ],
-  "built": [
+      "timestamp": "2026-08-27T22:45:00Z",
+      "deployed_at": "2026-08-28T06:22:00Z",
+      "location_name": "demo-detroit-dwsd",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/13",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-detroit-dwsd",
+      "note": "Graph-first, always-green build ('One Warehouse, Every Pipe') for a 30-minute first intro call with no AE discovery notes -- built from a job-posting-inferred brief. 11 assets (4 ingestion badged sqlserver/oracle, 5 warehouse, 2 reporting), 3 checks (2 blocking), 2 freshness policies, check-gated eager automation on the regulator-facing extract, one schedule. No I/O at all (asset bodies are pass), so no demo_mode toggle exists for this build. New GraphFirstAssetsComponent (registry gap recorded in component-feedback/2026-08-28-graph-first-assets.md) covers the no-op-body pattern; a native build_schedule_from_partitioned_job call replaces the registry cron_schedule component, which can't express a local hour alongside a partitions_def. Full validation gate green; verified zero-setup from a fresh clone."
+    },
     {
       "company": "Stellantis Financial Services",
       "slug": "stellantis-financial-services",
