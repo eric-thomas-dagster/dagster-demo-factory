@@ -1,5 +1,14 @@
 {
-  "brief-ready": [],
+  "brief-ready": [
+    {
+      "company": "Noleggiare (FTH Group)",
+      "slug": "noleggiare",
+      "status": "brief-ready",
+      "demo_date": "2026-09-04",
+      "brief_path": "briefs/2026-09-04-noleggiare.md",
+      "timestamp": "2026-09-02T23:00:00Z"
+    }
+  ],
   "built": [
     {
       "company": "City of Detroit — Water & Sewerage Department (DWSD)",
