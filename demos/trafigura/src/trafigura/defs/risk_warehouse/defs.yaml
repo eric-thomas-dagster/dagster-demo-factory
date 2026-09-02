@@ -1,0 +1,73 @@
+type: trafigura.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: dim_counterparty
+      deps: ["counterparty_reference_data_raw"]
+      group_name: risk_warehouse
+      kinds: ["redshift"]
+      owners: ["team:trafigura-data-eng"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Curated counterparty dimension -- the record every trade position
+        and exposure figure joins against.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "trade_capture"
+
+    - key: dim_commodity
+      deps: ["commodity_price_feed_raw"]
+      group_name: risk_warehouse
+      kinds: ["redshift"]
+      owners: ["team:trafigura-data-eng"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Curated commodity dimension -- reference data for every traded
+        commodity class, keyed for the position and exposure facts.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "market_data"
+
+    - key: fact_trade_position_daily
+      deps: ["trade_capture_raw", "dim_counterparty", "dim_commodity", "fx_rate_feed_raw", "freight_rate_feed_raw"]
+      group_name: risk_warehouse
+      kinds: ["redshift"]
+      owners: ["team:trafigura-data-eng"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        End-of-day trade position, marked against current commodity price,
+        FX, and freight rates -- the record every risk figure is computed
+        from.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "risk"
+        business_impact: "Directly determines every desk's reported end-of-day position."
+
+    - key: fact_credit_exposure_daily
+      deps: ["fact_trade_position_daily", "dim_counterparty"]
+      group_name: risk_warehouse
+      kinds: ["redshift"]
+      owners: ["team:trafigura-data-eng"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      freshness_policy: "{{ dg.FreshnessPolicy.time_window(fail_window=datetime.timedelta(hours=24), warn_window=datetime.timedelta(hours=18)) }}"
+      description: >-
+        Daily credit exposure by counterparty, reconciled against trade
+        position -- the money-shot asset: green, checked, fresh, feeding
+        the risk dashboard downstream.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "risk"
+        severity: "high"
+        business_impact: >-
+          Late or incorrect exposure figures mean a credit desk is trading
+          against a stale limit.

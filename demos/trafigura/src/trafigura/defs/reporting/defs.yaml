@@ -1,0 +1,18 @@
+type: trafigura.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: power_bi_trading_risk_dashboard
+      deps: ["fact_trade_position_daily", "fact_credit_exposure_daily"]
+      group_name: reporting
+      kinds: ["powerbi"]
+      owners: ["team:trafigura-data-eng"]
+      description: >-
+        Power BI dashboard reporting trading position and credit exposure --
+        the artifact traders and risk desk actually look at.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "risk"
+        business_impact: "Read by trading and risk desks every morning."

@@ -85,11 +85,6 @@ in the brief.
   it into a zero-compute `AssetsDefinition`; its history is only
   `AssetObservation`/`AssetCheckEvaluation` via
   `instance.report_runless_asset_event(event)`.
-- A checks-only job over such a non-executable asset **cannot** get a
-  `PartitionsDefinition` even passed explicitly (`_infer_and_validate_
-  common_partitions_def` only looks at `executable_asset_keys`, empty here)
-  — evaluate the check directly and report it via
-  `report_runless_asset_event` instead. (dagster==1.13.19)
 - `dg.ResolvedAssetSpec` (the YAML-facing type) accepts `partitions_def`,
   `automation_condition`, `freshness_policy`, `owners` inline per entry, and
   `@dg.multi_asset(specs=[spec])` infers `partitions_def` from the spec
@@ -110,8 +105,14 @@ in the brief.
 - An unpartitioned asset with a plain (non-argument) `deps=` edge to a
   partitioned, *unselected* upstream asset executes standalone fine via
   `job.execute_in_process(asset_selection=[...])` with no `partition_key` —
-  ordering-only deps don't require the upstream partition to already exist.
-  (verified 2026-08-28)
+  ordering-only deps don't require the upstream partition to already exist,
+  and this holds in **both directions** (unpartitioned-depends-on-partitioned
+  and partitioned-depends-on-unpartitioned). (verified 2026-08-28, 2026-09-02)
+- `DailyPartitionsDefinition.validate_partition_key` rejects the **current
+  day** as a key (`DagsterUnknownPartitionError`) — the day isn't complete
+  yet, so the newest valid key is always yesterday relative to wall-clock
+  time. `validate_e2e.py` validation dates must be `<= today - 1 day`.
+  (verified 2026-09-02, dagster==1.13.20)
 
 ## Environment
 
@@ -143,11 +144,13 @@ in the brief.
   the **state-write path** (no HTTP at load time — not a reason to reject
   one).
 - No registry/native component declares a list of no-op `AssetSpec`s from
-  YAML for graph-first (`pass`-bodied) demos — write one small custom
-  component (`assets: list[dg.ResolvedAssetSpec]`, one
-  `@dg.multi_asset(specs=[spec])` per entry); legitimate rung-4 case, since
-  there's no integration domain to subclass. (searched 2026-08-28,
-  dagster-community-components-cli 0.8.15)
+  YAML for graph-first (`pass`-bodied) demos (searched 2026-08-28,
+  dagster-community-components-cli 0.8.15) — `GraphFirstAssetsComponent`
+  (first built in `demos/detroit-dwsd`) fixes this and is reusable
+  byte-for-byte across every graph-first build: copy the file, update the
+  package import path, don't re-search or re-write feedback for the same
+  gap (cite `component-feedback/2026-08-28-graph-first-assets.md`).
+  (reused 2026-09-02, demos/trafigura)
 - Community `cron_schedule` component's partitioned-job mode rejects
   `cron_expression`/`execution_timezone` combined with
   `partition_type`/`hour_of_day` in either direction (`CheckError`) — use
