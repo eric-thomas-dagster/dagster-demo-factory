@@ -1,0 +1,32 @@
+type: trafigura.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: trade_capture_raw
+      group_name: trade_capture
+      kinds: ["s3"]
+      owners: ["team:trafigura-data-eng"]
+      description: >-
+        Raw trade capture feed -- every executed trade record before
+        counterparty/commodity reference data is resolved against it.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "trade_capture"
+        business_impact: >-
+          The source of record every downstream position and exposure
+          figure traces back to.
+
+    - key: counterparty_reference_data_raw
+      group_name: trade_capture
+      kinds: ["s3"]
+      owners: ["team:trafigura-data-eng"]
+      description: >-
+        Counterparty reference data -- credit limits, legal entity
+        hierarchy, and KYC/AML status for every trading counterparty.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "trade_capture"

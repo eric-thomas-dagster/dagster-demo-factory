@@ -1,0 +1,45 @@
+type: trafigura.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: commodity_price_feed_raw
+      group_name: market_data
+      kinds: ["s3"]
+      owners: ["team:trafigura-data-eng"]
+      description: >-
+        Commodity price feed landed from market-data providers -- the
+        reference prices trade positions are marked against.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "market_data"
+        business_impact: >-
+          Feeds position valuation directly -- stale prices mean an
+          inaccurate mark on every open position.
+
+    - key: fx_rate_feed_raw
+      group_name: market_data
+      kinds: ["s3"]
+      owners: ["team:trafigura-data-eng"]
+      description: >-
+        FX rate feed -- converts trades and positions denominated in
+        non-reporting currencies for cross-desk consolidation.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_1"
+        domain: "market_data"
+
+    - key: freight_rate_feed_raw
+      group_name: market_data
+      kinds: ["s3"]
+      owners: ["team:trafigura-data-eng"]
+      description: >-
+        Freight/logistics rate feed -- landed cost for physical commodity
+        positions depends on current shipping rates, not just commodity price.
+      metadata:
+        owner: "Trafigura Data Engineering"
+        owner_team: "team:trafigura-data-eng"
+        tier: "tier_2"
+        domain: "market_data"
