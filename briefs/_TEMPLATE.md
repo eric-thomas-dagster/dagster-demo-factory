@@ -83,7 +83,11 @@ story is better small. Say how many and why. -->
 
 ## Fidelity
 
-<!-- graph-first (default) | data-backed. graph-first = Dagster asset bodies are
+<!-- Applies ONLY to hand-written Python asset bodies (rollups, derived status
+assets). Integration surfaces are ALWAYS real components regardless — that is
+not a fidelity choice.
+
+stubbed (default) | data-backed. graph-first = Dagster asset bodies are
 `pass`, real dbt SQL, no synthetic data or mocked I/O. Far faster, always green,
 and enough for lineage/metadata/freshness/automation/coexistence stories. Choose
 data-backed ONLY if real values on screen matter — row counts that move, check

@@ -314,30 +314,61 @@ you can say the name of is a demo you can pitch in one line.
 **Be explicit about assumptions.** Anything you inferred rather than read in the
 brief goes in the README and the notification, marked as an assumption.
 
-## Fidelity: graph-first vs data-backed
+## Two separate axes — do not conflate them
 
-Two valid demo builds. **The brief chooses; default is graph-first.**
+### Axis 1: integration surfaces — ALWAYS real components. Not a choice.
 
-**Graph-first** — Dagster asset bodies are `pass`. No synthetic data, no mocked
-I/O, no generators. Real dbt SQL still runs (that's where lineage is legible).
-Everything materializes instantly and always green, because a `pass` asset can't
-fail.
+**Every external system named in the brief maps to a real component.** Fivetran
+uses the Fivetran component. Azure Data Factory uses the ADF component. Power BI
+uses the Power BI component. dbt uses `dagster-dbt`. Search the registry and the
+native integrations; something almost always exists.
 
-Use it when the demo is about lineage, metadata, freshness, automation,
-observability, and coexistence — which is most demos. Builds far faster, has
-almost no failure surface, and removes the entire demo_mode I/O apparatus.
+This is **not** affected by fidelity, demo mode, missing credentials, or build
+time. If you have no credentials, subclass the real component and mock its I/O
+seam — that's what rung 3 is for. You do **not** replace it with something of
+your own.
 
-**Data-backed** — asset bodies produce real synthetic data through mocked
-components. Costs a lot more build time and carries real failure risk.
+A demo that fakes the integration layer is worthless. The entire pitch is *"we
+orchestrate your stack"* — and a graph of home-made stand-ins proves the
+opposite. The prospect will ask "is that the real Fivetran integration?" and
+there is no recovering from no.
 
-Only justified when the demo needs *actual values* on screen: row counts that
-move, check results computed from data, a materialization that visibly changes a
-number. If nobody in the room will look at a value, don't build the machinery
-that produces it.
+**Report the mapping in the notification, every run**: each system in the brief,
+and the component ID used for it. A system with no component gets a
+`component-feedback/` entry explaining the gap — not a silent substitute.
 
-When graph-first, asset bodies contain `pass` and nothing else. No business
-logic in Dagster asset bodies either way — that belongs in dbt or in a
-component.
+### Axis 2: custom logic bodies — stubbed or implemented
+
+This is the only thing fidelity chooses, and it applies **only** to the small
+number of hand-written Python assets representing *your own* logic — a rollup, a
+summary, a derived status asset. Never to an integration.
+
+- **Stubbed (default)** — those bodies are `pass`. No synthetic data
+  generators, no fabricated values. Fast, always green.
+- **Data-backed** — those bodies compute real synthetic values. Only when actual
+  numbers on screen matter.
+
+Real dbt SQL runs in both cases.
+
+## Never invent a generic or meta component
+
+A component's name must identify **an external system or a real domain
+concept** — `FivetranAccountComponent`, `AzureDataFactoryComponent`,
+`CarrierRateFeedComponent`. If the name you're about to write describes a
+*technique* rather than a system, stop: you're building the wrong thing.
+
+Banned by construction: `GraphFirstAsset`, `DemoAsset`, `StubComponent`,
+`MockAsset`, `PlaceholderAsset`, `GenericPipeline`, or anything else whose
+purpose is "represent an asset." Dagster already has assets. A component that
+wraps nothing external is not a component; it's a detour around using the real
+one.
+
+A 2026-08 build wrote a `GraphFirstAsset` component and routed Fivetran, ADF,
+and Power BI through it — while real components existed for all three. That is
+the failure mode this rule exists to prevent.
+
+If you catch yourself writing a component to satisfy a *house rule* rather than
+to integrate a *system*, you have misread the house rule.
 
 ## Required metadata on every asset
 
