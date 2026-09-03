@@ -1,0 +1,24 @@
+type: noleggiare.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: fleet_residual_value_forecast
+      deps: ["fact_vehicle_sale", "fact_rental_contract"]
+      group_name: ml_workflows
+      kinds: ["python"]
+      owners: ["team:noleggiare-bi"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Forecasted residual value for fleet and inventory vehicles,
+        trained against realized sale and rental-return outcomes -- sits
+        inline in the same lineage as the ETL layer, the direct answer to
+        "how can ML workflows coexist with ETL pipelines," the way
+        Raffaele's team has already started building it themselves.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_2"
+        domain: "ml"
+        business_impact: >-
+          Informs fleet de-fleet timing and dealer trade-in pricing
+          decisions.
