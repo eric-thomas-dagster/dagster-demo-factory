@@ -2,23 +2,27 @@
 
 `dg launch --assets '*'` exits immediately on any partitioned asset ("Asset
 has partitions, but no '--partition' option was provided") -- two of this
-project's twelve assets (`marts/fct_quotes_daily`,
+project's thirteen assets (`marts/fct_quotes_daily`,
 `marts/fct_bound_policies_daily`) are daily-partitioned, so this script is
 the harness `scripts/validate_demo.sh` requires instead. It proves:
 
-1. The four Fivetran-badged ingestion assets execute standalone through the
+1. `legacy_adf_nightly_ingestion` -- the real, demo-mode-subclassed
+   `dagster_community_components.AzureDataFactoryComponent` -- executes
+   standalone, the incumbent this rebuild exists to represent as a
+   first-class asset instead of prose.
+2. The four Fivetran-badged ingestion assets execute standalone through the
    real `RvuFivetranComponent` (a `dagster_fivetran.FivetranAccountComponent`
    subclass), plus dbt staging and `dim_partner`, with every dbt-native test
    and the blocking panel-completeness check passing.
-2. The two daily-partitioned dbt facts materialize cleanly across two
+3. The two daily-partitioned dbt facts materialize cleanly across two
    validation dates, including the warning-severity reconciliation check.
-3. The two downstream activation/reporting assets -- `braze_customer_
+4. The two downstream activation/reporting assets -- `braze_customer_
    segment_export` (a plain demo-mode-mocked `@asset`) and
    `power_bi_quote_performance_report` (a real
    `dagster_powerbi.PowerBIWorkspaceComponent` subclass, modeled as its
    refreshable semantic model) -- execute standalone, depending on
    partitioned dbt facts via a plain `deps=` edge.
-4. Row counts are printed so determinism is visible across runs -- the dbt
+5. Row counts are printed so determinism is visible across runs -- the dbt
    layer runs real SQL over deterministic fixture data (see
    demo_data/fixtures/), and the Fivetran/Power BI demo-mode bodies report
    real row counts read back from the same warehouse.
@@ -39,6 +43,10 @@ warnings.filterwarnings("ignore")
 
 from rvu_tempcover.definitions import defs as defs_lazy  # noqa: E402
 from rvu_tempcover.demo_data.warehouse import demo_duckdb_path  # noqa: E402
+
+LEGACY_KEYS = [
+    dg.AssetKey("adf_pipeline_legacy_nightly_ingestion"),
+]
 
 UNPARTITIONED_KEYS = [
     dg.AssetKey("raw_quote_requests"),
@@ -61,7 +69,9 @@ DOWNSTREAM_KEYS = [
     dg.AssetKey("power_bi_quote_performance_report"),
 ]
 
-ALL_ASSET_COUNT = len(UNPARTITIONED_KEYS) + len(PARTITIONED_KEYS) + len(DOWNSTREAM_KEYS)  # 12
+ALL_ASSET_COUNT = (
+    len(LEGACY_KEYS) + len(UNPARTITIONED_KEYS) + len(PARTITIONED_KEYS) + len(DOWNSTREAM_KEYS)
+)  # 13
 
 # The daily partition definition starts 2026-08-01, and dbt's own vars
 # (min_date/max_date) span the fixture window through 2026-12-31; today's
@@ -134,6 +144,23 @@ def main() -> int:
     )
 
     seen_checks: set[str] = set()
+
+    print("\n==> Legacy incumbent (Azure Data Factory, demo-mode subclass)")
+    result = run(definitions, instance, LEGACY_KEYS, partition_key=None, label="legacy ADF pipeline")
+    check(True, "materialized adf_pipeline_legacy_nightly_ingestion")
+    mats = result.get_asset_materialization_events()
+    check(len(mats) == 1, "legacy ADF pipeline produced exactly one materialization")
+
+    print("\n==> Legacy incumbent observation sensor (detects runs Dagster didn't trigger)")
+    sensor_def = definitions.get_sensor_def("legacy_orchestration_observation_sensor")
+    with dg.build_sensor_context(instance=instance, definitions=definitions) as sensor_ctx:
+        observations = list(sensor_def(sensor_ctx))
+    check(len(observations) > 0, "sensor emitted at least one AssetObservation")
+    check(
+        all(o.asset_key == LEGACY_KEYS[0] for o in observations),
+        "every observation targets the same key as the materializable asset "
+        "(a registry gap -- see component-feedback/ -- makes this easy to get wrong)",
+    )
 
     print("\n==> Unpartitioned chain (Fivetran ingestion, dbt staging, dim_partner)")
     result = run(definitions, instance, UNPARTITIONED_KEYS, partition_key=None, label="unpartitioned chain")

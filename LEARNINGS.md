@@ -52,20 +52,15 @@ instead of discovering them one deploy cycle at a time.
 ## Deployment — timing and confirmation
 
 - Agent sync after PEX upload routinely takes several minutes. Normal, not a
-  hang.
-- **Run the deploy in the FOREGROUND via `./scripts/deploy_demo.sh`** and let it
-  block — it polls to a terminal state internally. Backgrounding it and then
-  managing the background task is what burned ~12 turns on "waiting for the
-  monitor" in the 2026-08-26 run: a Monitor, a fallback wakeup, and manual
-  polling all doing the job the script already does. Sequence the deploy last,
-  after the retro and notification draft. (2026-08-26)
-- **Never hand-roll the `dagster-cloud` command.** The script carries the
-  correct flags, the LOADED loop, and partial-failure cleanup. A hand-built
-  invocation with the wrong flag cost a full deploy cycle on 2026-08-26.
-- Exit code 0 from deploy does **not** mean the location loaded. Confirm with
-  `dg api` and look for `LOADED`.
-- `LOADED` means the definitions parsed. It does **not** mean assets
-  materialize in the cloud.
+  hang. Run `./scripts/deploy_demo.sh` in the **foreground** and let it block
+  (it polls to a terminal state internally) rather than backgrounding it and
+  managing a separate monitor/wakeup loop. Sequence deploy last, after the
+  retro and notification draft.
+- **Never hand-roll the `dagster-cloud` command** — the script carries the
+  correct flags, the LOADED loop, and partial-failure cleanup.
+- Exit code 0 from deploy does **not** mean the location loaded (`LOADED`
+  means definitions parsed, not that assets materialize). Confirm with
+  `dg api`.
 
 ## Dagster+ Serverless runtime
 
@@ -120,16 +115,6 @@ instead of discovering them one deploy cycle at a time.
   optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
   Requiring it with no fallback ships a demo that won't start.
 
-## Build sequencing that works
-
-## Connector quirks
-
-- **Drive search only returns Google-native files.** Docs/Sheets/Slides are
-  searchable; PDFs, DOCX, XLSX, PPTX are not, even though Drive indexes them.
-  Use the recent-files listing (returns metadata for all types) alongside
-  search, then read the file directly — *reading* PDFs and Office files works,
-  only search is blind to them. (2026-08-26)
-
 ## Environment
 
 - `GH_TOKEN` reads as literal `proxy-injected` when the GitHub proxy handles
@@ -153,17 +138,41 @@ instead of discovering them one deploy cycle at a time.
   (`assets_by_task_key` in `defs/workspace_us/defs.yaml`). (2026-08-26)
 - **Workspace components share one convention**: `@public` class,
   `translation:` field, `@public get_asset_spec(props)` override hook,
-  `polling_sensor` (alias `generate_sensor`, **default False**), `defs_state` +
+  `polling_sensor` (alias `generate_sensor`), `defs_state` +
   `defs_state_config`, `StateBackedComponent` inheritance. Holds for
   `FabricWorkspaceComponent`, `FivetranAccountComponent`,
   `SnowflakeWorkspaceComponent`, `MLflowWorkspaceComponent`,
-  `DatabricksWorkspaceComponent`, `PowerBIWorkspaceComponent`. (verified
-  2026-08-26)
-- **Observation sensors default to OFF.** Set `generate_sensor: true` or a demo
-  only executes and never sees runs it didn't trigger. (2026-08-26)
+  `DatabricksWorkspaceComponent`, `PowerBIWorkspaceComponent`,
+  `AzureDataFactoryComponent`. (verified 2026-08-26, 2026-09-03)
+- **Observation sensors usually default to OFF** (`polling_sensor`/
+  `generate_sensor: false`) — check every workspace component's actual
+  default before assuming, though: `AzureDataFactoryComponent` is a
+  confirmed exception, defaulting **True**. Read the field, don't assume
+  the convention. (2026-08-26, corrected 2026-09-03)
 - `StateBackedComponent` enumeration happens in the **state-write path**, so no
   HTTP fires at Dagster load time. "It queries a live connection at load time"
   is not a valid reason to reject one. (2026-08-26)
+- **Not every workspace component exposes an overridable execute method**
+  (`FivetranAccountComponent.execute()` and `PowerBIWorkspaceComponent.
+  build_semantic_model_refresh_asset_definition()` do; `AzureDataFactoryComponent`
+  inlines its trigger-and-poll logic in a private module function calling a
+  private free function, `_get_adf_client`, with no override point).
+  Fallback seam: monkeypatch the module-level free function for the
+  process's lifetime when `demo_mode=True` — a scoped patch-and-restore
+  doesn't work, since generated sensor/asset closures resolve it from
+  module globals at *call* time, not definition time. Also: its
+  `assets_by_pipeline_name` overrides a pipeline's spec `key:`, but its
+  observation sensor re-derives `asset_key` from the raw object name
+  instead of the override, so a key override there produces a dangling
+  observation — verify by evaluating the sensor directly, not just
+  `dg list defs`. See `component-feedback/2026-09-03-azure-data-factory-demo-mode-seam.md`.
+  (verified 2026-09-03)
+- **Azure SDK / msrest models coerce naive datetimes to UTC-aware on
+  assignment** (`azure.mgmt.datafactory.models.RunFilterParameters` does
+  this) — a demo-mode fixture comparing its own naive timestamps against
+  those fields raises `TypeError: can't compare offset-naive and
+  offset-aware datetimes`. Give any Azure-SDK-backed fixture UTC-aware
+  timestamps from the start. (verified 2026-09-03)
 
 ## Don't rebuild platform features
 
@@ -185,15 +194,15 @@ instead of discovering them one deploy cycle at a time.
   own. Cheap, and it keeps builds consistent. (2026-08-26)
 
 - **Never route an external system through a home-made component**, and check
-  *every* system, not just the easy ones. The rvu-tempcover build used real
-  components for Fivetran (`FivetranAccountComponent`, `fivetran_assets`,
-  `fivetran_sync_sensor`, `fivetran_sync_trigger_job`), Power BI, and dbt — then
-  gave Azure Data Factory no component at all, despite `azure_data_factory`
-  existing in the registry. Partial compliance reads as success and hides the
-  gap. **The system named in the demo thesis is the one most likely to be
-  missed and the one that matters most** — ADF was the incumbent the entire
-  pitch was built against. Report the system-to-component-ID mapping for every
-  system, and name any that resolved to nothing. (2026-09-04)
+  *every* system, not just the easy ones — partial compliance (3 of 4 systems
+  right) reads as success and hides the gap. **The system named in the demo
+  thesis is the one most likely to be missed and the one that matters most.**
+  rvu-tempcover needed three builds: home-made component for everything, then
+  Fivetran/Power BI/dbt fixed but the thesis's own named incumbent (ADF) left
+  as prose — even after this rule was already written down once. Check the
+  system-to-component-ID mapping against the brief's thesis sentence
+  specifically, every build; writing the rule down once isn't sufficient.
+  (2026-09-04, reconfirmed 2026-09-03)
 - **A component name must identify a system or domain concept**, never a
   technique. `GraphFirstAsset` / `DemoAsset` / `StubComponent` / `MockAsset` are
   always wrong — Dagster already has assets. (2026-08-27)
