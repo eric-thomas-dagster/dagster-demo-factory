@@ -1,0 +1,23 @@
+# The real, registry `snowflake_io_manager` component, subclassed for the
+# demo-mode seam (see src/noleggiare/components/demo_snowflake_io_manager.py).
+# fact_finance_consolidated_daily_snowflake writes through this resource --
+# same lineage, same deps as the Postgres-backed fact, different warehouse.
+# Flip demo_mode: false and supply real account/user/password_env_var/
+# database/warehouse to run this exact component against a live Snowflake
+# account.
+
+type: noleggiare.components.DemoSnowflakeIOManagerComponent
+
+attributes:
+  resource_key: snowflake_io_manager
+  # account/user are required by the real component's schema but unused
+  # while demo_mode is true -- set demo_mode: false and replace these two
+  # placeholders (plus password_env_var below) with real values to run
+  # against a live Snowflake account.
+  demo_mode: true
+  account: "REPLACE_WITH_SNOWFLAKE_ACCOUNT"
+  user: "REPLACE_WITH_SNOWFLAKE_USER"
+  password_env_var: NOLEGGIARE_SNOWFLAKE_PASSWORD
+  database: NOLEGGIARE_FUTURE_STATE
+  warehouse: COMPUTE_WH
+  schema_name: public
