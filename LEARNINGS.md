@@ -184,13 +184,16 @@ instead of discovering them one deploy cycle at a time.
   conventions (warehouse setup, check style, README shape) before inventing your
   own. Cheap, and it keeps builds consistent. (2026-08-26)
 
-- **Never route an external system through a home-made component.** A 2026-08
-  rvu-tempcover build wrote a `GraphFirstAsset` component and pushed Fivetran,
-  ADF, and Power BI through it — while `fivetran_assets`,
-  `fivetran_sync_sensor`, `fivetran_sync_trigger_job`, `azure_data_factory`, and
-  native `dagster-powerbi` all existed. Integration surfaces are always real
-  components; missing credentials means subclass and mock the I/O seam, not
-  substitute. (2026-08-27)
+- **Never route an external system through a home-made component**, and check
+  *every* system, not just the easy ones. The rvu-tempcover build used real
+  components for Fivetran (`FivetranAccountComponent`, `fivetran_assets`,
+  `fivetran_sync_sensor`, `fivetran_sync_trigger_job`), Power BI, and dbt — then
+  gave Azure Data Factory no component at all, despite `azure_data_factory`
+  existing in the registry. Partial compliance reads as success and hides the
+  gap. **The system named in the demo thesis is the one most likely to be
+  missed and the one that matters most** — ADF was the incumbent the entire
+  pitch was built against. Report the system-to-component-ID mapping for every
+  system, and name any that resolved to nothing. (2026-09-04)
 - **A component name must identify a system or domain concept**, never a
   technique. `GraphFirstAsset` / `DemoAsset` / `StubComponent` / `MockAsset` are
   always wrong — Dagster already has assets. (2026-08-27)
