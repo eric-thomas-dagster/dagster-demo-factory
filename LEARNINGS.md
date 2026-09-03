@@ -28,7 +28,13 @@ in the brief.
 ## Deployment
 
 - `pex` + `dagster-cloud` must be **project dependencies**, not just a CLI on
-  PATH, or `deploy_demo.sh` fails after validation passes.
+  PATH, or deploy fails with `.venv/bin/python: No module named pex` (pex is
+  a transitive dep of the real `dagster-cloud` package). Editing
+  `pyproject.toml` mid-build does **not** update `uv.lock`/the venv —
+  `dagster-component init --auto-install` only runs `uv pip install -e .` —
+  re-run **`uv sync`** after any dependency edit. `preflight_deploy.sh`'s
+  pex check false-passes on ambient `command -v pex`; the real test is
+  `python -c "import pex"` inside the activated project venv. (2026-09-03)
 - `dbt_project/` must live inside the package dir; gitignored build outputs
   (dbt `manifest.json`, defs-state) need `[tool.hatch.build.targets.wheel]
   force-include`/`artifacts` or they silently miss the wheel.
@@ -62,8 +68,7 @@ in the brief.
   badge) — override via a `DbtProjectComponent` subclass's `get_asset_spec`
   + `spec.replace_attributes(kinds={...})`; no other hook.
 - A bare `dg.AssetSpec` in `Definitions(assets=[...])` is the external/
-  observed-only pattern — history only via
-  `instance.report_runless_asset_event(...)`.
+  observed-only pattern — history only via `report_runless_asset_event(...)`.
 - `dg.ResolvedAssetSpec` (YAML) takes `partitions_def`, `automation_condition`,
   `freshness_policy`, `owners`, `metadata` inline. (dagster==1.13.20)
 - `defs` is a `LazyDefinitions` until **called** — `defs()` gives the real
@@ -73,24 +78,28 @@ in the brief.
   — check those via `defs().get_repository_def().asset_graph.get(key)`.
 - An unpartitioned asset's plain `deps=` on a partitioned, unselected
   upstream executes standalone fine with no `partition_key`, both directions.
-  (verified 2026-08-28, 09-02, 09-03)
+  A **multi-partitioned** downstream (`MultiPartitionsDefinition({"date":
+  daily, "company": static})`) with plain `deps=` on differently
+  single-`DailyPartitionsDefinition`-partitioned upstream assets also loads
+  and `execute_in_process`-es fine with no explicit `PartitionMapping` --
+  just give each partition shape its own `execute_in_process` call, they
+  can't share one `partition_key` arg. `MultiPartitionKey` reprs sorted
+  **alphabetically by dimension name** ("company|date"), not declaration
+  order. (verified repeatedly through 2026-09-03)
 - `DailyPartitionsDefinition` rejects the **current day** as a key —
   `validate_e2e.py` dates must be `<= today - 1`.
 - **`deps:` in component YAML needs the full path-prefixed key**
   (`"marts/fct_x"`, not `"fct_x"`) for a namespaced target — a mismatch
-  doesn't error, it silently creates a disconnected `group: default` stub.
-  Check `dg list defs --json` for stray `"group_name": "default"` entries.
-  (verified 2026-09-03)
-- `DbtProjectComponent`'s `translation:` block takes `owners:`/`metadata:`
-  applied to every asset the instance builds; `post_processing.assets[].
-  attributes.metadata` on one `target:` **merges additively** on top —
-  uniform owner/tier/domain plus per-asset overrides, no per-model repeats.
-  (verified 2026-09-03)
+  silently creates a disconnected `group: default` stub instead of erroring;
+  check `dg list defs --json` for stray `"group_name": "default"`.
+- `DbtProjectComponent`'s `translation:` block sets `owners:`/`metadata:` on
+  every asset the instance builds; `post_processing.assets[].
+  attributes.metadata` on one `target:` **merges additively** on top.
 - A dbt **`source`** (not `seed`) node whose `meta.dagster.asset_key` matches
-  an asset defined elsewhere is dependency-only and unifies with it (not a
-  duplicate) — lets a graph-first ingestion `AssetSpec` stand in for the
-  table a real dbt project reads, rows loaded by a non-Dagster bootstrap at
-  defs-load time. (demos/kapitus, reused demos/rvu-tempcover 2026-09-03)
+  an asset defined elsewhere is dependency-only and unifies with it — lets a
+  graph-first ingestion `AssetSpec` stand in for the table a real dbt
+  project reads, rows loaded by a non-Dagster bootstrap at defs-load time.
+  (demos/kapitus, reused demos/rvu-tempcover)
 
 ## Environment
 
@@ -104,8 +113,6 @@ in the brief.
 
 ## Registry behaviour and conventions
 
-- **Never assert a gap without searching** — registry has thin wrappers over
-  core Dagster (`cron_schedule`, `automation_condition_applicator`) too.
 - Prefer **workspace-style** components with an explicit mapping table
   (`assets_by_task_key`) over one instance per object.
   Convention: `translation:` field, `get_asset_spec(props)` hook,
@@ -122,12 +129,19 @@ in the brief.
 - Community `cron_schedule`'s partitioned mode rejects
   `cron_expression`/`execution_timezone` with `partition_type`/`hour_of_day`
   together — use native `dg.build_schedule_from_partitioned_job(hour_of_day=
-  ..., minute_of_hour=...)` for a specific local hour.
+  ..., minute_of_hour=...)` for a specific local hour. That native call
+  *itself* also rejects `execution_timezone` combined with `hour_of_day`/
+  `minute_of_hour` (`CheckError`) — the hour is expressed in the
+  `partitions_def`'s own timezone; there's no way to pin a schedule to a
+  different local hour without matching the partitions_def's tz.
+  (dagster==1.13.20, verified 2026-09-03)
+- `dagster-component search "qlik"` only surfaces **Qlik Compose** (a
+  data-warehouse-automation product) — no coverage for **Qlik Cloud**/Qlik
+  Sense (the BI/dashboard product), a different product under the same
+  vendor. Don't assume a vendor-name hit is the right product. (2026-09-03)
 
 ## Don't rebuild platform features
 
-- Dagster+ has **native alert policies** (Slack/Teams/email/PagerDuty) —
-  never hand-roll alerting.
 - Jobs: `define_asset_job` + `AssetSelection`, never call asset functions
   inside a job body.
 - Verify feature-floor items actually appear in `dg list defs --json` /
