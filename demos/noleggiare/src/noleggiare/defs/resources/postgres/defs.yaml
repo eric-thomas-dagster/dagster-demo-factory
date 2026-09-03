@@ -1,0 +1,18 @@
+# The real, registry `postgres_io_manager` component, subclassed for the
+# demo-mode seam (see src/noleggiare/components/demo_postgres_io_manager.py).
+# Every asset in noleggiare_rental_ops, tomasi_dealer_ops, and
+# shared_finance_warehouse writes through this resource. Flip demo_mode:
+# false and supply real host/database/user/password_env_var to run this
+# exact component against a live PostgreSQL instance.
+
+type: noleggiare.components.DemoPostgresIOManagerComponent
+
+attributes:
+  resource_key: postgres_io_manager
+  demo_mode: true
+  host: localhost
+  port: 5432
+  database: noleggiare_bi
+  user: dagster_demo
+  password_env_var: NOLEGGIARE_POSTGRES_PASSWORD
+  default_schema: public

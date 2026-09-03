@@ -1,0 +1,13 @@
+type: noleggiare.components.QlikCloudExportComponent
+
+attributes:
+  asset_key: qlik_cloud_export
+  deps: ["fact_finance_consolidated_daily"]
+  group_name: bi_publish
+  owners: ["team:noleggiare-bi"]
+  demo_mode: true
+  description: >-
+    Publishes the consolidated finance fact to the shared Qlik Cloud
+    workspace both companies' Finance teams read from. The one asset in
+    this demo with a real network boundary -- flip demo_mode to false and
+    supply QLIK_CLOUD_* credentials to publish against a live tenant.
