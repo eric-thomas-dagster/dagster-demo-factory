@@ -9,15 +9,29 @@
       "timestamp": "2026-09-02T23:00:00Z"
     },
     {
-      "company": "RVU (Tempcover)",
-      "slug": "rvu-tempcover",
+      "company": "Noleggiare (FTH Group)",
+      "slug": "noleggiare",
       "status": "brief-ready",
       "demo_date": "2026-09-04",
-      "brief_path": "briefs/2026-09-04-rvu-tempcover.md",
-      "timestamp": "2026-09-02T23:30:00Z"
+      "brief_path": "briefs/2026-09-04-noleggiare.md",
+      "timestamp": "2026-09-02T23:00:00Z"
     }
   ],
   "built": [
+    {
+      "company": "RVU (Tempcover)",
+      "slug": "rvu-tempcover",
+      "status": "deployed",
+      "demo_date": "2026-09-04",
+      "brief_path": "briefs/2026-09-04-rvu-tempcover.md",
+      "timestamp": "2026-09-02T23:30:00Z",
+      "deployed_at": "2026-09-03T06:35:00Z",
+      "location_name": "demo-rvu-tempcover",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/15",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-rvu-tempcover",
+      "note": "Graph-first ingestion/activation/reporting with a real dbt Core layer ('From Ran to Right'), for a 90-minute technical deep-dive/competitive eval vs. Cloud Composer. 12 assets (4 ingestion badged fivetran, 6 dbt badged dbt+bigquery -- 3 staging, dim_partner, 2 daily-partitioned facts, 1 activation badged braze, 1 reporting badged powerbi) -- the brief's own '~16 assets' sizing note doesn't match its explicit 12-item enumeration; built the named list, flagged the discrepancy (same precedent as demos/trafigura). dbt runs for real against DuckDB with 11 native not_null/unique tests auto-surfaced as Dagster checks, plus 2 custom checks (1 blocking) computed against real fixture data, not hardcoded passes. Corrected a brief inconsistency: the panel-completeness check was specified to block fct_quotes_daily, which has no real dependency on panel data -- rewired to gate stg_panel_feed's automation and gave fct_bound_policies_daily a genuine ref('stg_panel_feed') dependency so the gating is a real lineage edge. Freshness on both daily facts, eager automation (one check-gated), one 07:00 Europe/London schedule (assumed hour, no SLA given). Raw fixture data (CSVs, deterministic) loaded by a non-Dagster bootstrap at defs-load time, not a Dagster asset -- keeps the ingestion layer genuinely graph-first while giving dbt real rows to test. Reused detroit-dwsd's GraphFirstAssetsComponent verbatim (component-feedback/2026-08-28-graph-first-assets.md); registry searched for power bi/braze/fivetran, confirmed no zero-credential-capable component exists for any of the three. Full validation gate green; verified zero-setup from a fresh clone with no env vars set."
+    },
     {
       "company": "Trafigura Group",
       "slug": "trafigura",
