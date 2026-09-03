@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: dim_partner
+    description: "One row per corporate partner / broker on Tempcover's panel."
+    columns:
+      - name: partner_id
+        data_tests: [unique, not_null]
+
+  - name: fct_quotes_daily
+    description: "Daily quote volume and conversion rate, by channel."
+    columns:
+      - name: quote_date
+        data_tests: [not_null]
+
+  - name: fct_bound_policies_daily
+    description: "Daily bound-policy volume and premium, by panel insurer."
+    columns:
+      - name: bind_date
+        data_tests: [not_null]
