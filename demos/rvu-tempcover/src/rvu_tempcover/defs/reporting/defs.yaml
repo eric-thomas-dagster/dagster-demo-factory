@@ -1,0 +1,23 @@
+type: rvu_tempcover.components.RvuPowerBIComponent
+
+attributes:
+  demo_mode: true
+
+  # Never called in demo mode -- placeholder literals are enough (all three
+  # credential fields are required strings, so an unset `{{ env.VAR }}` would
+  # fail to resolve). To run against RVU's real Power BI workspace: set
+  # demo_mode to false, fill in the real workspace_id, and replace the three
+  # credential lines with `{{ env.POWERBI_CLIENT_ID }}` /
+  # `{{ env.POWERBI_CLIENT_SECRET }}` / `{{ env.POWERBI_TENANT_ID }}`.
+  workspace:
+    credentials:
+      client_id: "unused-in-demo-mode"
+      client_secret: "unused-in-demo-mode"
+      tenant_id: "unused-in-demo-mode"
+    workspace_id: "rvu-demo-powerbi-workspace"
+
+  # The semantic model this component discovers is the dataset backing
+  # power_bi_quote_performance_report -- refreshing it is the real
+  # triggerable action, so it's the one PowerBI object worth making
+  # materializable (see components/powerbi.py module docstring).
+  enable_semantic_model_refresh: true

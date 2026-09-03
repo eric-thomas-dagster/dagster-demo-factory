@@ -215,17 +215,46 @@ instead of discovering them one deploy cycle at a time.
   conventions (warehouse setup, check style, README shape) before inventing your
   own. Cheap, and it keeps builds consistent. (2026-08-26)
 
-- **Warehouse IO managers exist as real registry components, not just native
-  `dagster-<vendor>` packages**: `postgres_io_manager` (wraps SQLAlchemy +
-  psycopg2 directly) and `snowflake_io_manager` (wraps the native
-  `dagster-snowflake-pandas` `SnowflakePandasIOManager`) both do genuine
-  partition-aware I/O — reach for these over a no-op asset body whenever a
-  brief names Postgres/Snowflake and no live credentials exist. Demo-mode
-  them the same way as any other resource-seam component: subclass, add
-  `demo_mode`, and swap the returned IO manager for
-  `dagster_duckdb_pandas.DuckDBPandasIOManager` (also real, also native)
-  when true; `demo_mode: false` calls `super().build_defs()` untouched.
-  (verified 2026-09-03, `dagster-community-components-cli`)
+- **Never route an external system through a home-made component.** Both
+  detroit-dwsd-style `GraphFirstAsset` no-op components and their pass-bodied
+  siblings are only legitimate when the brief names zero external systems.
+  Two 2026-09-03 fixes: rvu-tempcover's ingestion/reporting layers moved from
+  `GraphFirstAsset` to native `dagster_fivetran.FivetranAccountComponent` /
+  `dagster_powerbi.PowerBIWorkspaceComponent` (subclass overriding only
+  `write_state_to_path` and `execute` /
+  `build_semantic_model_refresh_asset_definition`); noleggiare's
+  Postgres/Snowflake-badged warehouse layer moved to the registry's
+  `postgres_io_manager` / `snowflake_io_manager` (wrapping SQLAlchemy+psycopg2
+  and `dagster-snowflake-pandas` respectively) with a subclass that swaps in
+  `dagster_duckdb_pandas.DuckDBPandasIOManager` under `demo_mode: true` and
+  calls `super().build_defs()` untouched otherwise. Integration surfaces are
+  always real components, including for a graph-first/pass-body layer if the
+  brief names the underlying system — missing credentials means subclass and
+  mock the I/O seam, not substitute. (2026-08-27, fixed 2026-09-03)
+- **A component name must identify a system or domain concept**, never a
+  technique. `GraphFirstAsset` / `DemoAsset` / `StubComponent` / `MockAsset` are
+  always wrong — Dagster already has assets. (2026-08-27)
+- **`PowerBIWorkspaceComponent` is `@dataclass`-based**, not pydantic
+  `dg.Model`-based like `FivetranAccountComponent`/`FabricWorkspaceComponent`.
+  A subclass adding a field must itself be `@dataclass` with a plain field
+  annotated `Resolver.default(description=...)` (from `dagster.components.
+  resolved.base`) — a pydantic `Field()` default on a dataclass-based
+  component is invisible to the `Resolvable` schema and fails YAML validation
+  with "Additional properties are not allowed", not a type error. Check
+  `dataclasses.is_dataclass(BaseComponent)` before subclassing. (dagster-
+  powerbi 0.29.20, verified 2026-09-03)
+- **A component-built sensor name can embed a config value verbatim**
+  (`FivetranAccountComponent`'s `polling_sensor` is `fivetran_{account_id}
+  __sync_status_sensor`) — a hyphenated placeholder ID fails Dagster's
+  `^[A-Za-z0-9_]+$` name regex at defs-load time. Use underscores in any
+  demo-mode placeholder ID a workspace component might fold into a generated
+  object name. (verified 2026-09-03)
+- **`PowerBIWorkspaceComponent` only makes semantic models executable** —
+  dashboards/reports build as plain non-executable `AssetSpec`s unless a
+  content item is a semantic model matched by `enable_semantic_model_refresh`
+  (`build_semantic_model_refresh_asset_definition` is the only materializable
+  path). Model a demo's "report" asset as the semantic model backing it, not
+  the report content type. (dagster-powerbi 0.29.20, verified 2026-09-03)
 
 ## Dead ends
 

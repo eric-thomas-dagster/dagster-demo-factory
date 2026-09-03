@@ -1,0 +1,33 @@
+type: rvu_tempcover.components.RvuDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts_daily
+  select: "fct_quotes_daily fct_bound_policies_daily"
+  translation:
+    group_name: dbt
+    partitions_def: "{{ daily_partitions_def }}"
+    owners: ["team:rvu-data-platform"]
+    metadata:
+      owner: "RVU Data Platform"
+      owner_team: "team:rvu-data-platform"
+      tier: "tier_1"
+      domain: "quoting_and_policy"
+
+post_processing:
+  assets:
+    - target: "marts/fct_quotes_daily"
+      attributes:
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ daily_freshness }}"
+    - target: "marts/fct_bound_policies_daily"
+      attributes:
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ daily_freshness }}"
+        metadata:
+          business_impact: "Read by underwriting and finance every morning via Power BI."
+          severity: "high"

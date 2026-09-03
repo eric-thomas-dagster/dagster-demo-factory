@@ -1,0 +1,90 @@
+type: rvu_tempcover.components.RvuFivetranComponent
+
+attributes:
+  demo_mode: true
+  demo_seed: 20260903
+
+  # Never called in demo mode -- placeholder literals are enough (both fields
+  # are required strings, so an unset `{{ env.VAR }}` would fail to resolve).
+  # To run against RVU's real Fivetran account: set demo_mode to false and
+  # replace these two lines with `{{ env.FIVETRAN_API_KEY }}` /
+  # `{{ env.FIVETRAN_API_SECRET }}` (or your own env var names).
+  workspace:
+    account_id: "rvu_demo_account"
+    api_key: "unused-in-demo-mode"
+    api_secret: "unused-in-demo-mode"
+
+  # Detects Fivetran syncs Dagster didn't trigger (Fivetran's own auto
+  # schedule firing outside of Dagster) and emits observations. Default is
+  # false -- must be turned on explicitly, per LEARNINGS.md.
+  polling_sensor: true
+
+  # One entry per Fivetran-synced source table. Adding RVU's next Fivetran
+  # connector is one more entry here, never a new component instance.
+  connectors:
+    raw_quote_requests:
+      connector_id: "conn_quote_requests"
+      connector_name: "quote_requests_source"
+      service: "postgresql"
+      schema_name: "raw"
+      table_name: "quote_requests"
+      asset_key: "raw_quote_requests"
+      group_name: "ingestion"
+      tier: "tier_1"
+      domain: "quoting"
+      owner_team: "team:rvu-data-platform"
+      description: >-
+        Quote requests captured across price comparison, direct web, partner
+        referral, and app channels -- synced by Fivetran from Tempcover's
+        quoting system.
+
+    raw_bound_policies:
+      connector_id: "conn_bound_policies"
+      connector_name: "bound_policies_source"
+      service: "postgresql"
+      schema_name: "raw"
+      table_name: "bound_policies"
+      asset_key: "raw_bound_policies"
+      group_name: "ingestion"
+      tier: "tier_1"
+      domain: "policy_admin"
+      owner_team: "team:rvu-data-platform"
+      description: >-
+        Bound temporary motor insurance policies, synced by Fivetran from the
+        policy administration system.
+      business_impact: >-
+        The system of record for bound premium -- feeds finance reporting and
+        the panel-insurer reconciliation story directly.
+
+    raw_panel_insurer_feed:
+      connector_id: "conn_panel_insurer_feed"
+      connector_name: "panel_insurer_feed_source"
+      service: "sftp"
+      schema_name: "raw"
+      table_name: "panel_insurer_feed"
+      asset_key: "raw_panel_insurer_feed"
+      group_name: "ingestion"
+      tier: "tier_1"
+      domain: "panel_management"
+      owner_team: "team:rvu-data-platform"
+      description: >-
+        Daily capacity and status feed from Tempcover's panel of underwriting
+        insurers -- synced by Fivetran.
+      business_impact: >-
+        A quiet or incomplete panel feed means bound policies can't be
+        reconciled against real underwriting capacity.
+
+    raw_partner_broker_feed:
+      connector_id: "conn_partner_broker_feed"
+      connector_name: "partner_broker_feed_source"
+      service: "sftp"
+      schema_name: "raw"
+      table_name: "partner_broker_feed"
+      asset_key: "raw_partner_broker_feed"
+      group_name: "ingestion"
+      tier: "tier_2"
+      domain: "partner_management"
+      owner_team: "team:rvu-data-platform"
+      description: >-
+        Reference data for Tempcover's 85+ corporate partners and brokers --
+        synced by Fivetran.
