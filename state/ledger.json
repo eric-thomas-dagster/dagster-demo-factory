@@ -18,16 +18,16 @@
     {
       "company": "RVU (Tempcover)",
       "slug": "rvu-tempcover",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "2026-09-04",
       "brief_path": "briefs/2026-09-04-rvu-tempcover.md",
       "timestamp": "2026-09-02T23:30:00Z",
-      "deployed_at": "2026-09-03T06:35:00Z",
+      "deployed_at": "2026-09-03T14:20:00Z",
       "location_name": "demo-rvu-tempcover",
       "deployment": "prod",
-      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/15",
-      "note": "Graph-first ingestion/activation/reporting with a real dbt Core layer ('From Ran to Right'), for a 90-minute technical deep-dive/competitive eval vs. Cloud Composer. 12 assets (4 ingestion badged fivetran, 6 dbt badged dbt+bigquery -- 3 staging, dim_partner, 2 daily-partitioned facts, 1 activation badged braze, 1 reporting badged powerbi) -- the brief's own '~16 assets' sizing note doesn't match its explicit 12-item enumeration; built the named list, flagged the discrepancy (same precedent as demos/trafigura). dbt runs for real against DuckDB with 11 native not_null/unique tests auto-surfaced as Dagster checks, plus 2 custom checks (1 blocking) computed against real fixture data, not hardcoded passes. Corrected a brief inconsistency: the panel-completeness check was specified to block fct_quotes_daily, which has no real dependency on panel data -- rewired to gate stg_panel_feed's automation and gave fct_bound_policies_daily a genuine ref('stg_panel_feed') dependency so the gating is a real lineage edge. Freshness on both daily facts, eager automation (one check-gated), one 07:00 Europe/London schedule (assumed hour, no SLA given). Raw fixture data (CSVs, deterministic) loaded by a non-Dagster bootstrap at defs-load time, not a Dagster asset -- keeps the ingestion layer genuinely graph-first while giving dbt real rows to test. Reused detroit-dwsd's GraphFirstAssetsComponent verbatim (component-feedback/2026-08-28-graph-first-assets.md); registry searched for power bi/braze/fivetran, confirmed no zero-credential-capable component exists for any of the three. Full validation gate green; verified zero-setup from a fresh clone with no env vars set.",
-      "reset_at": "2026-09-03T09:50:34"
+      "pr_url": "PENDING",
+      "note": "REBUILD (fixes PR #15 defect): the prior build routed Fivetran and Power BI through a home-made GraphFirstAssetsComponent instead of the real integrations, despite the brief naming both explicitly -- flagged in requests/done/rvu-tempcover-2026-09-03.md. This rebuild subclasses the real, native dagster_fivetran.FivetranAccountComponent and dagster_powerbi.PowerBIWorkspaceComponent (both already follow the workspace-component convention) with a demo-mode I/O seam per templates/demo_mode_pattern.py -- write_state_to_path (discovery) and execute/build_semantic_model_refresh_asset_definition (sync/refresh) are the only mocked methods; asset keys, specs, checks, and YAML schema are unchanged from live-account output. Braze has no registry or native component (3 distinct searches, zero hits -- component-feedback/2026-09-03-braze-export.md) so it stays a plain demo-mode-mocked @asset, per the brief's own fallback. Same 12-asset graph/dbt project/checks/freshness/automation as the reverted build ('From Ran to Right'): 4 ingestion badged fivetran, 6 dbt badged dbt+bigquery (3 staging, dim_partner, 2 daily-partitioned facts, real dbt Core against DuckDB, 13 native tests + 2 custom checks incl. 1 blocking), 1 activation badged braze, 1 reporting badged powerbi (modeled as its refreshable semantic model -- the real triggerable action underneath a Power BI report). Fivetran observation sensor turned on (polling_sensor: true, default off). Full validation gate green (dg check defs/yaml, dg list defs, validate_e2e.py, preflight); verified zero-setup from a genuinely fresh clone.",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-rvu-tempcover"
     },
     {
       "company": "Trafigura Group",

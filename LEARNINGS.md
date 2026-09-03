@@ -120,8 +120,6 @@ instead of discovering them one deploy cycle at a time.
   optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
   Requiring it with no fallback ships a demo that won't start.
 
-## Build sequencing that works
-
 ## Connector quirks
 
 - **Drive search only returns Google-native files.** Docs/Sheets/Slides are
@@ -185,15 +183,46 @@ instead of discovering them one deploy cycle at a time.
   own. Cheap, and it keeps builds consistent. (2026-08-26)
 
 - **Never route an external system through a home-made component.** A 2026-08
-  rvu-tempcover build wrote a `GraphFirstAsset` component and pushed Fivetran,
-  ADF, and Power BI through it — while `fivetran_assets`,
-  `fivetran_sync_sensor`, `fivetran_sync_trigger_job`, `azure_data_factory`, and
-  native `dagster-powerbi` all existed. Integration surfaces are always real
-  components; missing credentials means subclass and mock the I/O seam, not
-  substitute. (2026-08-27)
+  rvu-tempcover build wrote a `GraphFirstAsset` component and pushed Fivetran
+  and Power BI through it — while native `dagster_fivetran.
+  FivetranAccountComponent` and `dagster_powerbi.PowerBIWorkspaceComponent`
+  both existed and needed only the standard demo-mode subclass seam. Fixed
+  2026-09-03 (`demos/rvu-tempcover/src/rvu_tempcover/components/{fivetran,
+  powerbi}.py`) — reference these for the pattern on any future Fivetran or
+  Power BI build: override `write_state_to_path` (discovery) and `execute` /
+  `build_semantic_model_refresh_asset_definition` (sync/refresh) only.
+  Integration surfaces are always real components; missing credentials means
+  subclass and mock the I/O seam, not substitute. (2026-08-27, fix 2026-09-03)
 - **A component name must identify a system or domain concept**, never a
   technique. `GraphFirstAsset` / `DemoAsset` / `StubComponent` / `MockAsset` are
   always wrong — Dagster already has assets. (2026-08-27)
+- **`PowerBIWorkspaceComponent` is `@dataclass`-based**, not pydantic
+  `dg.Model`-based like `FivetranAccountComponent`/`FabricWorkspaceComponent`.
+  A subclass adding a field must itself be `@dataclass` with a plain field
+  annotated `Resolver.default(description=...)` (from `dagster.components.
+  resolved.base`) — a pydantic `Field()` default on a dataclass-based
+  component is invisible to the `Resolvable` schema and fails YAML validation
+  with "Additional properties are not allowed", not a type error. Check
+  `dataclasses.is_dataclass(BaseComponent)` before subclassing. (dagster-
+  powerbi 0.29.20, verified 2026-09-03)
+- **`{{ env.VAR_NAME }}` (dot-access) resolves to Python `None` when unset**,
+  not an empty string. A required `str` pydantic resource field then fails
+  validation at defs-load time even if the field is never read in demo mode.
+  For a credential block that's genuinely unused in demo mode, use a literal
+  placeholder (e.g. `"unused-in-demo-mode"`), not `{{ env.VAR }}`. (verified
+  2026-09-03)
+- **A component-built sensor name can embed a config value verbatim**
+  (`FivetranAccountComponent`'s `polling_sensor` is `fivetran_{account_id}
+  __sync_status_sensor`) — a hyphenated placeholder ID fails Dagster's
+  `^[A-Za-z0-9_]+$` name regex at defs-load time. Use underscores in any
+  demo-mode placeholder ID a workspace component might fold into a generated
+  object name. (verified 2026-09-03)
+- **`PowerBIWorkspaceComponent` only makes semantic models executable** —
+  dashboards/reports build as plain non-executable `AssetSpec`s unless a
+  content item is a semantic model matched by `enable_semantic_model_refresh`
+  (`build_semantic_model_refresh_asset_definition` is the only materializable
+  path). Model a demo's "report" asset as the semantic model backing it, not
+  the report content type. (dagster-powerbi 0.29.20, verified 2026-09-03)
 
 ## Dead ends
 
