@@ -1,0 +1,51 @@
+type: noleggiare.components.WarehouseTableAssetsComponent
+
+attributes:
+  io_manager_key: postgres_io_manager
+  assets:
+    - key: rental_bookings_raw
+      group_name: noleggiare_rental_ops
+      kinds: ["postgres"]
+      owners: ["team:noleggiare-bi"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Rental booking records landed from Noleggiare's rental/reservation
+        system -- the intake side of the rental business, one row per booking.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_2"
+        domain: "rental_ops"
+        deployment_mode: "demo (stub rows written through a real Postgres IO manager, DuckDB-backed)"
+
+    - key: fleet_vehicles_raw
+      group_name: noleggiare_rental_ops
+      kinds: ["postgres"]
+      owners: ["team:noleggiare-bi"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Fleet vehicle master landed from Noleggiare's fleet management
+        system -- every vehicle in the 10,000+ rental fleet, its current
+        status and location.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_2"
+        domain: "rental_ops"
+        deployment_mode: "demo (stub rows written through a real Postgres IO manager, DuckDB-backed)"
+
+    - key: rental_contracts_raw
+      group_name: noleggiare_rental_ops
+      kinds: ["postgres"]
+      owners: ["team:noleggiare-bi"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Signed rental contracts landed from Noleggiare's rental system --
+        the record every rental revenue figure is computed from.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_1"
+        domain: "rental_ops"
+        deployment_mode: "demo (stub rows written through a real Postgres IO manager, DuckDB-backed)"
+        business_impact: "Source of every rental revenue figure Finance reports on."

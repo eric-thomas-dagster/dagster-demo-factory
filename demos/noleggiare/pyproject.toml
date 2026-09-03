@@ -1,0 +1,43 @@
+[project]
+name = "noleggiare"
+requires-python = ">=3.10,<3.15"
+version = "0.1.0"
+dependencies = [
+    "dagster==1.13.20",
+    "dagster-cloud>=1.13.20",
+    "dagster-duckdb-pandas>=0.29.20",
+    # Real dependencies of the two registry IO manager components this
+    # project subclasses (postgres_io_manager, snowflake_io_manager) --
+    # declared explicitly so demo_mode: false plus real credentials works
+    # out of the box, not just after a manual pip install.
+    "psycopg2-binary>=2.9.0",
+    "sqlalchemy>=2.0.0",
+    "dagster-snowflake-pandas>=0.29.20",
+]
+
+[dependency-groups]
+dev = [
+    "dagster-dg-cli",
+    "dagster-webserver",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+force-include = { "pyproject.toml" = "pyproject.toml" }
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "noleggiare"
+registry_modules = [
+    "noleggiare.components.*",
+]
+
+
+
+[project.entry-points."dagster_dg_cli.registry_modules"]
+noleggiare_components = "noleggiare.components"

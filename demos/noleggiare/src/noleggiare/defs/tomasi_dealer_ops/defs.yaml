@@ -1,0 +1,52 @@
+type: noleggiare.components.WarehouseTableAssetsComponent
+
+attributes:
+  io_manager_key: postgres_io_manager
+  assets:
+    - key: vehicle_inventory_raw
+      group_name: tomasi_dealer_ops
+      kinds: ["postgres"]
+      owners: ["team:noleggiare-bi"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Dealer vehicle inventory landed from Tomasi Auto's inventory
+        system -- every vehicle on the lot or in transit, across the
+        multi-brand dealer network.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_2"
+        domain: "dealer_ops"
+        deployment_mode: "demo (stub rows written through a real Postgres IO manager, DuckDB-backed)"
+
+    - key: dealer_sales_raw
+      group_name: tomasi_dealer_ops
+      kinds: ["postgres"]
+      owners: ["team:noleggiare-bi"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Completed vehicle sales landed from Tomasi Auto's dealer system --
+        the record behind ~19,000 vehicles/year and >EUR300M revenue.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_1"
+        domain: "dealer_ops"
+        deployment_mode: "demo (stub rows written through a real Postgres IO manager, DuckDB-backed)"
+        business_impact: "Source of every dealer sales revenue figure Finance reports on."
+
+    - key: service_orders_raw
+      group_name: tomasi_dealer_ops
+      kinds: ["postgres"]
+      owners: ["team:noleggiare-bi"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Post-sale service and warranty orders landed from Tomasi Auto's
+        service department -- feeds warranty reserve and after-sales
+        margin on the vehicle sale fact.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_2"
+        domain: "dealer_ops"
+        deployment_mode: "demo (stub rows written through a real Postgres IO manager, DuckDB-backed)"

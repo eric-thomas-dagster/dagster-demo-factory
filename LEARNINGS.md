@@ -103,6 +103,20 @@ instead of discovering them one deploy cycle at a time.
   (verified 2026-08-26)
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
+- **`dagster-component add <id>` in a canonical `create-dagster` project
+  installs the component as a real importable Python package** at
+  `src/<pkg>/components/<id>/` (plus a starter instance at
+  `src/<pkg>/defs/<id>/defs.yaml`) — so `from <pkg>.components.<id> import
+  <Class>` works and the class can be subclassed directly, not just
+  configured via YAML. (verified 2026-09-03, `postgres_io_manager` /
+  `snowflake_io_manager`)
+- **`dagster-component add` installs the component's real pip dependencies
+  into the active venv but does NOT add them to `pyproject.toml`'s
+  `[project.dependencies]`.** A fresh clone + `uv sync` will not have them,
+  and the deploy PEX won't bundle them either — add them manually
+  (`requirements.txt` in the installed component dir names the exact set)
+  if the component's live (non-demo-mode) path is meant to work
+  out of the box. (verified 2026-09-03)
 
 ## APIs and schemas
 
@@ -113,6 +127,30 @@ instead of discovering them one deploy cycle at a time.
   verified 2026-08-24)
 - `components/__init__.py` must re-export each component class, or the UI
   Components tab won't list them even when `dg list components` does.
+- **`dagster._core.storage.db_io_manager.DbIOManager`** (the base every
+  Db-based IO manager — `dagster-duckdb`, `dagster-snowflake`, and any
+  registry component wrapping raw SQLAlchemy — shares) requires
+  `partition_expr` in the asset's `definition_metadata` for any partitioned
+  asset, or `handle_output` raises `ValueError` at materialize time (not at
+  `dg check defs` time — only caught by an actual run). For a single
+  `TimeWindowPartitionsDefinition`, `partition_expr` is a plain column-name
+  string; for a `MultiPartitionsDefinition`, it's a dict `{dimension_name:
+  column_name}` covering every dimension. The column must hold real values
+  the DB can filter on (a `datetime` for time-window dimensions, compared
+  as `>= start AND < end`; the literal partition-key string for static
+  dimensions, compared via `IN (...)`). (dagster 1.13.20, verified
+  2026-09-03)
+- `AssetSpec.with_io_manager_key(key)` is the way to bind a specific IO
+  manager resource key to a `specs=`-built `@multi_asset` output (sets the
+  `dagster/io_manager_key` system metadata) — the `specs=` API has no
+  `io_manager_key` parameter of its own, unlike `@asset`/`AssetOut`.
+  (dagster 1.13.20, verified 2026-09-03)
+- A required (non-`Optional`) `str` component field templated as
+  `"{{ env.UNSET_VAR }}"` resolves to Python `None`, not `""` — Pydantic
+  then rejects it (`Input should be a valid string [type=string_type,
+  input_value=None]`) even though the field is only a template string.
+  Give required-but-unused-in-demo-mode fields a literal placeholder value
+  instead of an unset-env-var template. (verified 2026-09-03)
 
 ## Project config
 
@@ -165,11 +203,6 @@ instead of discovering them one deploy cycle at a time.
 
 ## Don't rebuild platform features
 
-- Dagster+ has **native alert policies** for Slack, Teams, email, and
-  PagerDuty, covering run failures, asset check failures, freshness violations,
-  and schedule/sensor failures. Never hand-roll alerting in a demo — it implies
-  the platform lacks something it has. Show it in the UI instead. (2026-08-25)
-
 - Jobs: use `define_asset_job` with `AssetSelection`. Never call asset functions
   inside a job definition. (2026-08-26)
 
@@ -182,17 +215,22 @@ instead of discovering them one deploy cycle at a time.
   conventions (warehouse setup, check style, README shape) before inventing your
   own. Cheap, and it keeps builds consistent. (2026-08-26)
 
-- **Never route an external system through a home-made component.** A 2026-08
-  rvu-tempcover build wrote a `GraphFirstAsset` component and pushed Fivetran
-  and Power BI through it — while native `dagster_fivetran.
-  FivetranAccountComponent` and `dagster_powerbi.PowerBIWorkspaceComponent`
-  both existed and needed only the standard demo-mode subclass seam. Fixed
-  2026-09-03 (`demos/rvu-tempcover/src/rvu_tempcover/components/{fivetran,
-  powerbi}.py`) — reference these for the pattern on any future Fivetran or
-  Power BI build: override `write_state_to_path` (discovery) and `execute` /
-  `build_semantic_model_refresh_asset_definition` (sync/refresh) only.
-  Integration surfaces are always real components; missing credentials means
-  subclass and mock the I/O seam, not substitute. (2026-08-27, fix 2026-09-03)
+- **Never route an external system through a home-made component.** Both
+  detroit-dwsd-style `GraphFirstAsset` no-op components and their pass-bodied
+  siblings are only legitimate when the brief names zero external systems.
+  Two 2026-09-03 fixes: rvu-tempcover's ingestion/reporting layers moved from
+  `GraphFirstAsset` to native `dagster_fivetran.FivetranAccountComponent` /
+  `dagster_powerbi.PowerBIWorkspaceComponent` (subclass overriding only
+  `write_state_to_path` and `execute` /
+  `build_semantic_model_refresh_asset_definition`); noleggiare's
+  Postgres/Snowflake-badged warehouse layer moved to the registry's
+  `postgres_io_manager` / `snowflake_io_manager` (wrapping SQLAlchemy+psycopg2
+  and `dagster-snowflake-pandas` respectively) with a subclass that swaps in
+  `dagster_duckdb_pandas.DuckDBPandasIOManager` under `demo_mode: true` and
+  calls `super().build_defs()` untouched otherwise. Integration surfaces are
+  always real components, including for a graph-first/pass-body layer if the
+  brief names the underlying system — missing credentials means subclass and
+  mock the I/O seam, not substitute. (2026-08-27, fixed 2026-09-03)
 - **A component name must identify a system or domain concept**, never a
   technique. `GraphFirstAsset` / `DemoAsset` / `StubComponent` / `MockAsset` are
   always wrong — Dagster already has assets. (2026-08-27)
@@ -205,12 +243,6 @@ instead of discovering them one deploy cycle at a time.
   with "Additional properties are not allowed", not a type error. Check
   `dataclasses.is_dataclass(BaseComponent)` before subclassing. (dagster-
   powerbi 0.29.20, verified 2026-09-03)
-- **`{{ env.VAR_NAME }}` (dot-access) resolves to Python `None` when unset**,
-  not an empty string. A required `str` pydantic resource field then fails
-  validation at defs-load time even if the field is never read in demo mode.
-  For a credential block that's genuinely unused in demo mode, use a literal
-  placeholder (e.g. `"unused-in-demo-mode"`), not `{{ env.VAR }}`. (verified
-  2026-09-03)
 - **A component-built sensor name can embed a config value verbatim**
   (`FivetranAccountComponent`'s `polling_sensor` is `fivetran_{account_id}
   __sync_status_sensor`) — a hyphenated placeholder ID fails Dagster's
