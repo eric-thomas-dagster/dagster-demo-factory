@@ -20,12 +20,6 @@ One or two lines each. No narrative, no run stories. Version-sensitive facts
 carry the version they were checked against, so a future run knows when to
 re-verify. **Hard cap ~100 lines — if over, cut the weakest before appending.**
 
-**No tool-specific content and no registry inventories.** The registry has
-~975 components; listing which exist would go stale immediately and is what
-`dagster-component search --json` is for. Record *conventions and behaviours*
-a source read reveals — a field's default, a shared class shape, a documented
-override hook.
-
 Never put prospect-specific content here. Tooling facts here, prospect facts
 in the brief.
 
@@ -33,139 +27,108 @@ in the brief.
 
 ## Deployment
 
-- `pex` must be installed and `dagster-cloud` a **project dependency** (not
-  just a CLI on PATH), or `deploy_demo.sh` fails after validation passes.
-- `--package-name` must be the module holding `Definitions`; verify with
-  `python -c "import <pkg>"`.
-- `dbt_project/` must live inside the package dir or it won't ship in the
-  wheel. `.gitignore`d files (dbt `manifest.json`, defs-state) don't ship
-  either — force-include via `[tool.hatch.build.targets.wheel]`.
+- `pex` + `dagster-cloud` must be **project dependencies**, not just a CLI on
+  PATH, or `deploy_demo.sh` fails after validation passes.
+- `dbt_project/` must live inside the package dir; gitignored build outputs
+  (dbt `manifest.json`, defs-state) need `[tool.hatch.build.targets.wheel]
+  force-include`/`artifacts` or they silently miss the wheel.
 - Run `dg utils refresh-defs-state` before deploying state-backed components
-  (Fivetran, dbt) or the location fails to load remotely.
-- Verify wheel *contents*, don't trust config:
-  `unzip -l dist/*.whl | grep -E "manifest|defs_state"`.
-- Run `deploy_demo.sh` in the **foreground**, in one call — it already polls
-  to a terminal state; backgrounding it just re-implements that wait. Agent
-  sync after PEX upload routinely takes several minutes; normal, not a hang.
-- Deploy exit 0 does **not** mean the location loaded — confirm with
-  `dg api code-location list --json` (`status: LOADED`). `LOADED` means
-  definitions parsed, not that assets materialize.
+  (Fivetran, dbt), and verify wheel *contents*
+  (`unzip -l dist/*.whl | grep -E "manifest|defs_state"`), not config.
+- Run `deploy_demo.sh` in the **foreground** — it already polls to LOADED.
+  Exit 0 ≠ loaded; confirm with `dg api code-location list --json`.
 - Dagster+ Serverless storage is **ephemeral** (fresh container per run) —
-  anything spanning multiple runs (local DuckDB, state files) works locally
-  and silently breaks in Serverless. Give interactive demos via `dg dev`;
-  treat the deployed location as proof it loads, not as the recovery-sequence
-  stage.
+  local DuckDB/state files don't survive between runs. Give interactive
+  demos via `dg dev`; the deployed location is proof-it-loads, not a
+  multi-run recovery stage.
 
 ## CLI
 
-- **Use `dg`, never the legacy `dagster` CLI** (`dg dev`, `dg launch
-  --assets '*'` — note `--assets` not `--select`). (dagster-dg-cli 1.13.19)
-- `dg launch --assets '*'` **cannot validate a partitioned project** — exits
-  with "no '--partition' option was provided". Every build with partitions
-  ships `validate_e2e.py`; `scripts/validate_demo.sh` calls it.
-- `Definitions.resolve_implicit_job_def_def_for_assets(asset_keys)` is the
-  real method name (doubled `def_def` is not a typo).
-- `dagster-component init` does **not** scaffold a project (`create-dagster
-  project` first) and needs `--auto-install` or it hangs unattended.
-- `dagster-component search` takes **one** positional arg — put multiple
-  terms inside one quoted string (AND-ed across id/name/description/tags).
-  Always pass `--json`.
-- If `dg list components` misses a custom component, re-run
+- **`dg`, never legacy `dagster`** (`dg dev`, `dg launch --assets '*'`).
+- `dg launch --assets '*'` **can't validate a partitioned project** ("no
+  '--partition' option") — ship `validate_e2e.py`; `validate_demo.sh` calls it.
+- `Definitions.resolve_implicit_job_def_def_for_assets(...)` — doubled
+  `def_def` is the real name, not a typo.
+- `dagster-component init` needs `create-dagster project` first and
+  `--auto-install` or it hangs unattended.
+- `dagster-component search` takes **one** positional arg (AND-ed terms);
+  always pass `--json`.
+- `dg list components` missing a custom component → re-run
   `dagster-component init --force`.
 
 ## APIs and schemas
 
-- dbt asset `kinds` derive from the manifest's `adapter_type` (DuckDB badges
-  everything `duckdb`) — override via `DagsterDbtTranslator.get_asset_spec`
-  + `spec.replace_attributes(kinds={...})`. No other hook exists.
-- `components/__init__.py` must re-export each component class or the UI
-  Components tab won't list it even when `dg list components` does.
-- A bare `dg.AssetSpec` in `Definitions(assets=[...])` (not wrapped in
-  `@asset`) is the real external/observed-only asset pattern — Dagster wraps
-  it into a zero-compute `AssetsDefinition`; its history is only
-  `AssetObservation`/`AssetCheckEvaluation` via
-  `instance.report_runless_asset_event(event)`.
-- `dg.ResolvedAssetSpec` (the YAML-facing type) accepts `partitions_def`,
-  `automation_condition`, `freshness_policy`, `owners` inline per entry, and
-  `@dg.multi_asset(specs=[spec])` infers `partitions_def` from the spec
-  itself — no redundant top-level `partitions_def=` kwarg needed.
-  (dagster==1.13.20, verified 2026-08-28)
-- The `@definitions`-decorated `defs` object in `<pkg>/definitions.py` is a
-  `LazyDefinitions` (fields: `count`, `has_context_arg`, `load_fn`) until
-  **called** — `defs()` resolves it to a real `Definitions` with
-  `.resolve_implicit_job_def_def_for_assets()` / `.get_repository_def()`.
-  Importing `defs` alone isn't enough for a script like `validate_e2e.py`.
-  (verified 2026-08-28)
-- `dg list defs --json` per-asset fields are a fixed subset (`asset_key`,
-  `description`, `group_name`, `kinds`, `dependency_keys`, `owners`,
-  `automation_condition`, `is_executable`, `source`) — no `partitions_def`,
-  `freshness_policy`, or `metadata`. Verify those via
-  `defs().get_repository_def().asset_graph.get(key)` directly, not the JSON
-  listing. (verified 2026-08-28)
-- An unpartitioned asset with a plain (non-argument) `deps=` edge to a
-  partitioned, *unselected* upstream asset executes standalone fine via
-  `job.execute_in_process(asset_selection=[...])` with no `partition_key` —
-  ordering-only deps don't require the upstream partition to already exist,
-  and this holds in **both directions** (unpartitioned-depends-on-partitioned
-  and partitioned-depends-on-unpartitioned). (verified 2026-08-28, 2026-09-02)
-- `DailyPartitionsDefinition.validate_partition_key` rejects the **current
-  day** as a key (`DagsterUnknownPartitionError`) — the day isn't complete
-  yet, so the newest valid key is always yesterday relative to wall-clock
-  time. `validate_e2e.py` validation dates must be `<= today - 1 day`.
-  (verified 2026-09-02, dagster==1.13.20)
+- dbt asset `kinds` derive from manifest `adapter_type` (DuckDB → `duckdb`
+  badge) — override via a `DbtProjectComponent` subclass's `get_asset_spec`
+  + `spec.replace_attributes(kinds={...})`; no other hook.
+- A bare `dg.AssetSpec` in `Definitions(assets=[...])` is the external/
+  observed-only pattern — history only via
+  `instance.report_runless_asset_event(...)`.
+- `dg.ResolvedAssetSpec` (YAML) takes `partitions_def`, `automation_condition`,
+  `freshness_policy`, `owners`, `metadata` inline. (dagster==1.13.20)
+- `defs` is a `LazyDefinitions` until **called** — `defs()` gives the real
+  `Definitions` (`.resolve_implicit_job_def_def_for_assets()` /
+  `.get_repository_def()`), required for `validate_e2e.py`.
+- `dg list defs --json` omits `partitions_def`/`freshness_policy`/`metadata`
+  — check those via `defs().get_repository_def().asset_graph.get(key)`.
+- An unpartitioned asset's plain `deps=` on a partitioned, unselected
+  upstream executes standalone fine with no `partition_key`, both directions.
+  (verified 2026-08-28, 09-02, 09-03)
+- `DailyPartitionsDefinition` rejects the **current day** as a key —
+  `validate_e2e.py` dates must be `<= today - 1`.
+- **`deps:` in component YAML needs the full path-prefixed key**
+  (`"marts/fct_x"`, not `"fct_x"`) for a namespaced target — a mismatch
+  doesn't error, it silently creates a disconnected `group: default` stub.
+  Check `dg list defs --json` for stray `"group_name": "default"` entries.
+  (verified 2026-09-03)
+- `DbtProjectComponent`'s `translation:` block takes `owners:`/`metadata:`
+  applied to every asset the instance builds; `post_processing.assets[].
+  attributes.metadata` on one `target:` **merges additively** on top —
+  uniform owner/tier/domain plus per-asset overrides, no per-model repeats.
+  (verified 2026-09-03)
+- A dbt **`source`** (not `seed`) node whose `meta.dagster.asset_key` matches
+  an asset defined elsewhere is dependency-only and unifies with it (not a
+  duplicate) — lets a graph-first ingestion `AssetSpec` stand in for the
+  table a real dbt project reads, rows loaded by a non-Dagster bootstrap at
+  defs-load time. (demos/kapitus, reused demos/rvu-tempcover 2026-09-03)
 
 ## Environment
 
-- `profiles.yml`-style config needs a **working default** with the env var as
-  an optional override (`{{ env_var('X_PATH', 'demo_data/demo.duckdb') }}`) —
-  required-with-no-fallback ships a demo that won't start.
-- `GH_TOKEN` reads as literal `proxy-injected` when the GitHub proxy handles
-  auth — not a usable token, treat as unset.
-- Gmail exposes `create_draft` but no send; routines run without approval
-  prompts. Draft + mobile push; never report the missing send as a failure.
-- Cloud env vars are **not** visible to the setup script — session shell only.
-- Briefs and `state/ledger.json` must live on `main`; anything on an unmerged
-  branch is invisible to Factory and the run silently no-ops.
+- `profiles.yml` needs a **working default** with env var override
+  (`env_var('X', 'demo_data/demo.duckdb')`) — no-fallback-required breaks
+  zero-setup.
+- `GH_TOKEN` reads `proxy-injected` when the GitHub proxy handles auth —
+  treat as unset.
+- Gmail: `create_draft` only, no send. Draft + mobile push; not a failure.
+- Briefs/`state/ledger.json` must live on `main` or Factory can't see them.
 
 ## Registry behaviour and conventions
 
-- **Never assert a registry gap without searching** — the registry includes
-  thin wrappers over core Dagster calls (`cron_schedule`,
-  `automation_condition_applicator`), so "this is core Dagster" is not
-  evidence of absence. Search, always, with `--json`.
-- Use the **workspace-style** component with an explicit mapping table in
-  `defs.yaml` (e.g. `assets_by_task_key`), not one instance per external
-  object. Reference: `databricks-workspace-bundles-demo`.
-- **Workspace components share one convention**: `@public` class,
-  `translation:` field, `@public get_asset_spec(props)` override hook,
-  `polling_sensor` (alias `generate_sensor`, **default False** — set true or
-  the demo never sees externally-triggered runs), `defs_state` +
-  `defs_state_config`, `StateBackedComponent` inheritance with enumeration in
-  the **state-write path** (no HTTP at load time — not a reason to reject
-  one).
-- No registry/native component declares a list of no-op `AssetSpec`s from
-  YAML for graph-first (`pass`-bodied) demos (searched 2026-08-28,
-  dagster-community-components-cli 0.8.15) — `GraphFirstAssetsComponent`
-  (first built in `demos/detroit-dwsd`) fixes this and is reusable
-  byte-for-byte across every graph-first build: copy the file, update the
-  package import path, don't re-search or re-write feedback for the same
-  gap (cite `component-feedback/2026-08-28-graph-first-assets.md`).
-  (reused 2026-09-02, demos/trafigura)
-- Community `cron_schedule` component's partitioned-job mode rejects
-  `cron_expression`/`execution_timezone` combined with
-  `partition_type`/`hour_of_day` in either direction (`CheckError`) — use
-  native `dg.build_schedule_from_partitioned_job(hour_of_day=...,
-  minute_of_hour=...)` directly when a specific local hour matters.
-  (verified 2026-08-28)
+- **Never assert a gap without searching** — registry has thin wrappers over
+  core Dagster (`cron_schedule`, `automation_condition_applicator`) too.
+- Prefer **workspace-style** components with an explicit mapping table
+  (`assets_by_task_key`) over one instance per object.
+  Convention: `translation:` field, `get_asset_spec(props)` hook,
+  `polling_sensor`/`generate_sensor` (**default False**), `StateBackedComponent`
+  with enumeration in the state-write path (no HTTP at load time).
+- `fivetran`/`powerbi`/`braze` (searched 2026-09-03): no workspace component
+  works with zero credentials — all require a real account to enumerate at
+  state-write time. `GraphFirstAssetsComponent` covers the gap.
+- No component declares no-op `AssetSpec`s from YAML for graph-first demos
+  (searched 2026-08-28) — `GraphFirstAssetsComponent` (`demos/detroit-dwsd`)
+  is reusable byte-for-byte; copy the file, update the import path, cite
+  `component-feedback/2026-08-28-graph-first-assets.md`, don't re-search.
+  (reused demos/trafigura 09-02, demos/rvu-tempcover 09-03)
+- Community `cron_schedule`'s partitioned mode rejects
+  `cron_expression`/`execution_timezone` with `partition_type`/`hour_of_day`
+  together — use native `dg.build_schedule_from_partitioned_job(hour_of_day=
+  ..., minute_of_hour=...)` for a specific local hour.
 
 ## Don't rebuild platform features
 
-- Dagster+ has **native alert policies** (Slack/Teams/email/PagerDuty) for
-  run failures, check failures, freshness violations, schedule/sensor
-  failures. Never hand-roll alerting in a demo.
-- Jobs: use `define_asset_job` with `AssetSelection`. Never call asset
-  functions inside a job definition.
-- **Verify each feature-floor item actually appears in `dg list defs
-  --json`** (or, for fields the JSON omits, in the resolved `Definitions`
-  object directly) — a component declaring a config field doesn't mean it
-  built anything from it.
+- Dagster+ has **native alert policies** (Slack/Teams/email/PagerDuty) —
+  never hand-roll alerting.
+- Jobs: `define_asset_job` + `AssetSelection`, never call asset functions
+  inside a job body.
+- Verify feature-floor items actually appear in `dg list defs --json` /
+  the resolved `Definitions` — a config field doesn't mean it built anything.

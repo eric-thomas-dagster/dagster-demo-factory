@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: quote_requests
+        meta:
+          dagster:
+            asset_key: ["raw_quote_requests"]
+      - name: bound_policies
+        meta:
+          dagster:
+            asset_key: ["raw_bound_policies"]
+      - name: panel_insurer_feed
+        meta:
+          dagster:
+            asset_key: ["raw_panel_insurer_feed"]
+      - name: partner_broker_feed
+        meta:
+          dagster:
+            asset_key: ["raw_partner_broker_feed"]

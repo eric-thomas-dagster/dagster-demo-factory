@@ -1,0 +1,20 @@
+type: rvu_tempcover.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: braze_customer_segment_export
+      deps: ["marts/fct_quotes_daily"]
+      group_name: activation
+      kinds: ["braze"]
+      owners: ["team:rvu-data-platform"]
+      description: >-
+        Customer segments derived from daily quote behaviour, exported to
+        Braze for activation campaigns (e.g. re-engaging abandoned quotes).
+      metadata:
+        owner: "RVU Data Platform"
+        owner_team: "team:rvu-data-platform"
+        tier: "tier_2"
+        domain: "activation"
+        business_impact: >-
+          Sits in the same lineage graph as the quoting pipeline it's
+          derived from -- not a side integration nobody can trace.
