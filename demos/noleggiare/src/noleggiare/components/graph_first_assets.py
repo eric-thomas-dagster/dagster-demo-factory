@@ -1,0 +1,70 @@
+"""Graph-first, pass-bodied asset factory.
+
+Brief fidelity is graph-first: lineage, checks, freshness, and automation
+carry the story, not real data, so every asset body is a no-op. The
+registry has no component for "declare a list of no-op assets from YAML" --
+that's a generic authoring need, not an integration domain, so rungs 1-3 of
+the component escalation ladder don't apply. Search record and suggested
+registry addition: `component-feedback/2026-08-28-graph-first-assets.md`
+(first written for demos/detroit-dwsd; reused here rather than re-searched,
+since it's the same gap).
+
+One instance of this component covers every asset in a source domain --
+adding the prospect's next source is one more `assets:` entry in `defs.yaml`,
+never another component instance or another Python file.
+"""
+
+import dagster as dg
+
+DAILY_PARTITIONS = dg.DailyPartitionsDefinition(
+    start_date="2026-08-01",
+    timezone="UTC",
+)
+
+COMPANY_PARTITIONS = dg.StaticPartitionsDefinition(["noleggiare", "tomasi_auto"])
+
+COMPANY_DATE_PARTITIONS = dg.MultiPartitionsDefinition(
+    {"date": DAILY_PARTITIONS, "company": COMPANY_PARTITIONS}
+)
+
+
+class GraphFirstAssetsComponent(dg.Component, dg.Resolvable, dg.Model):
+    """Materializes each declared `AssetSpec` with a trivial no-op body.
+
+    Asset keys, deps, partitions, metadata, and checks all come from the
+    spec itself -- this class contributes no business logic, only the empty
+    execution function every graph-first asset needs.
+    """
+
+    assets: list[dg.ResolvedAssetSpec]
+
+    @staticmethod
+    @dg.template_var
+    def daily_partitions() -> dg.DailyPartitionsDefinition:
+        """Shared instance so cross-asset partition mappings resolve by identity."""
+        return DAILY_PARTITIONS
+
+    @staticmethod
+    @dg.template_var
+    def company_date_partitions() -> dg.MultiPartitionsDefinition:
+        """Shared instance for the cross-company consolidated fact and its
+        Snowflake-variant twin -- date x company, per the brief's explicit
+        directive that company be a real partition dimension, not a tag.
+        """
+        return COMPANY_DATE_PARTITIONS
+
+    def build_defs(self, context: dg.ComponentLoadContext) -> dg.Definitions:
+        return dg.Definitions(assets=[self._build_asset(spec) for spec in self.assets])
+
+    @staticmethod
+    def _build_asset(spec: dg.AssetSpec) -> dg.AssetsDefinition:
+        op_name = "_".join(spec.key.path)
+
+        @dg.multi_asset(specs=[spec], name=op_name)
+        def _materialize(context: dg.AssetExecutionContext) -> None:
+            context.log.info(
+                f"{spec.key.to_user_string()}: graph-first demo asset -- "
+                "lineage, checks, and automation are the point, not data movement."
+            )
+
+        return _materialize

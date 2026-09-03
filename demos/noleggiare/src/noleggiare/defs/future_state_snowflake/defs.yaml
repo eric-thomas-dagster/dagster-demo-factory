@@ -1,0 +1,23 @@
+type: noleggiare.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: fact_finance_consolidated_daily_snowflake
+      deps: ["fact_rental_contract", "fact_vehicle_sale"]
+      group_name: future_state_snowflake
+      kinds: ["snowflake"]
+      owners: ["team:noleggiare-bi"]
+      partitions_def: "{{ company_date_partitions }}"
+      description: >-
+        Same logical asset as fact_finance_consolidated_daily -- same
+        deps, same date x company partitioning -- on a Snowflake resource
+        instead of Postgres. Exists purely to make "swap the warehouse,
+        not the pipeline" a literal thing to click through: this is the
+        whole Postgres-to-Snowflake conversation, and it's a resource
+        config change, not an orchestration rewrite.
+      metadata:
+        owner: "Noleggiare/Tomasi Auto BI Team"
+        owner_team: "team:noleggiare-bi"
+        tier: "tier_2"
+        domain: "finance"
+        deployment_mode: "future-state preview (parallel to the Postgres path, not a migration in progress)"
