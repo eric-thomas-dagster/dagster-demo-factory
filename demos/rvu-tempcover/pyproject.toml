@@ -1,0 +1,48 @@
+[project]
+name = "rvu_tempcover"
+requires-python = ">=3.10,<3.15"
+version = "0.1.0"
+dependencies = [
+    "dagster==1.13.20",
+    "dagster-cloud>=1.13.20",
+    "dagster-dbt>=0.29.20",
+    "dagster-duckdb>=0.29.20",
+    "dbt-core>=1.11.14",
+    "dbt-duckdb>=1.11.0",
+    "duckdb>=1.1.0",
+    "pex>=2.59.5",
+]
+
+[dependency-groups]
+dev = [
+    "dagster-dg-cli",
+    "dagster-webserver",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Both paths are gitignored, and hatchling excludes gitignored files from the
+# wheel by default -- they then go missing at runtime in Dagster+. See
+# LEARNINGS.md and scripts/preflight_deploy.sh.
+force-include = { "pyproject.toml" = "pyproject.toml" }
+artifacts = [
+    "src/rvu_tempcover/defs/.local_defs_state/**",
+    "src/rvu_tempcover/dbt_project/target/**",
+]
+
+[tool.dg]
+directory_type = "project"
+
+[tool.dg.project]
+root_module = "rvu_tempcover"
+registry_modules = [
+    "rvu_tempcover.components.*",
+]
+
+
+
+[project.entry-points."dagster_dg_cli.registry_modules"]
+rvu_tempcover_components = "rvu_tempcover.components"

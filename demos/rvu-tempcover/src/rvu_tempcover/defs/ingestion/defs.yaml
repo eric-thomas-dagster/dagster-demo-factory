@@ -1,0 +1,66 @@
+type: rvu_tempcover.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: raw_quote_requests
+      group_name: ingestion
+      kinds: ["fivetran"]
+      owners: ["team:rvu-data-platform"]
+      description: >-
+        Quote requests captured across price comparison, direct web, partner
+        referral, and app channels -- synced by Fivetran from Tempcover's
+        quoting system.
+      metadata:
+        owner: "RVU Data Platform"
+        owner_team: "team:rvu-data-platform"
+        tier: "tier_1"
+        domain: "quoting"
+        integration_pattern: "fivetran_managed_ingestion"
+
+    - key: raw_bound_policies
+      group_name: ingestion
+      kinds: ["fivetran"]
+      owners: ["team:rvu-data-platform"]
+      description: >-
+        Bound temporary motor insurance policies, synced by Fivetran from
+        the policy administration system.
+      metadata:
+        owner: "RVU Data Platform"
+        owner_team: "team:rvu-data-platform"
+        tier: "tier_1"
+        domain: "policy_admin"
+        integration_pattern: "fivetran_managed_ingestion"
+        business_impact: >-
+          The system of record for bound premium -- feeds finance reporting
+          and the panel-insurer reconciliation story directly.
+
+    - key: raw_panel_insurer_feed
+      group_name: ingestion
+      kinds: ["fivetran"]
+      owners: ["team:rvu-data-platform"]
+      description: >-
+        Daily capacity and status feed from Tempcover's panel of underwriting
+        insurers -- synced by Fivetran.
+      metadata:
+        owner: "RVU Data Platform"
+        owner_team: "team:rvu-data-platform"
+        tier: "tier_1"
+        domain: "panel_management"
+        integration_pattern: "fivetran_managed_ingestion"
+        business_impact: >-
+          A quiet or incomplete panel feed means bound policies can't be
+          reconciled against real underwriting capacity.
+
+    - key: raw_partner_broker_feed
+      group_name: ingestion
+      kinds: ["fivetran"]
+      owners: ["team:rvu-data-platform"]
+      description: >-
+        Reference data for Tempcover's 85+ corporate partners and brokers --
+        synced by Fivetran.
+      metadata:
+        owner: "RVU Data Platform"
+        owner_team: "team:rvu-data-platform"
+        tier: "tier_2"
+        domain: "partner_management"
+        integration_pattern: "fivetran_managed_ingestion"
