@@ -1,0 +1,9 @@
+{
+  "id": "azure_data_factory",
+  "name": "Azure Data Factory Workspace",
+  "category": "integration",
+  "ref": "main",
+  "version": "1.0.0",
+  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/integrations/azure_data_factory/component.py",
+  "installed_at": "2026-09-03T21:34:57+00:00"
+}

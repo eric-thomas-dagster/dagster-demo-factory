@@ -206,6 +206,7 @@ __marimo__/
 # Dagster object. Regenerated from demo_data/fixtures/ on every load.
 src/rvu_tempcover/demo_data/demo.duckdb
 
-# Dagster state-backed component cache (dbt manifest). Gitignored locally,
-# but force-included in the deploy wheel -- see pyproject.toml and LEARNINGS.md.
+# Dagster state-backed component cache (dbt manifest, ADF/Fivetran/Power BI
+# discovery). Gitignored locally, but force-included in the deploy wheel --
+# see pyproject.toml and LEARNINGS.md.
 .local_defs_state/

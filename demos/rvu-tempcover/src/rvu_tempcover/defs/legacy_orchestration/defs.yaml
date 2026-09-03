@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/integrations/azure_data_factory/schema.json
+type: rvu_tempcover.components.DemoAzureDataFactoryComponent
+
+attributes:
+  demo_mode: true
+
+  # Never called in demo mode -- placeholder literals are enough. To point
+  # this at RVU's real Azure Data Factory: set demo_mode to false and
+  # replace subscription_id/resource_group_name/factory_name with the real
+  # values (Service Principal env vars, or omit them entirely for
+  # DefaultAzureCredential on a managed identity).
+  workspace:
+    subscription_id: "unused-in-demo-mode"
+    resource_group_name: "rvu-legacy-rg"
+    factory_name: "rvu-legacy-adf"
+
+  import_pipelines: true
+  import_triggers: false
+
+  # Detects ADF pipeline runs Dagster didn't trigger -- RVU's own scheduler
+  # firing this pipeline outside of Dagster, exactly the "what happens when
+  # it wasn't Dagster that started it" question. Defaults true on this
+  # component already (see LEARNINGS.md -- unlike Fivetran/Power BI, whose
+  # `polling_sensor` defaults false), set explicitly here for discoverability.
+  polling_sensor: true
+  poll_interval_seconds: 60
+
+  group_name: legacy_orchestration
+
+  # The only supported per-pipeline customization hook for pipeline assets
+  # (see components/azure_data_factory_demo.py docstring, point 2) --
+  # `translation:`/`get_asset_spec()` don't fire for pipelines in this
+  # component, only for the untested external-asset kinds. Deliberately NOT
+  # overriding `key:` here (docstring point 3): the observation sensor
+  # re-derives each observation's asset key from the raw pipeline name
+  # rather than honoring this override, so overriding it would produce a
+  # materializable asset and an observed asset with two different keys.
+  # The pipeline is named `legacy_nightly_ingestion` so the component's own
+  # default key (`adf_pipeline_legacy_nightly_ingestion`) already reads
+  # cleanly without an override.
+  assets_by_pipeline_name:
+    legacy_nightly_ingestion:
+      description: >-
+        The incumbent: one ADF pipeline that copies quote, policy, panel,
+        and partner data into the legacy Azure warehouse every night. It
+        can report that the copy ran; it has no equivalent of the
+        completeness or reconciliation checks the Fivetran+dbt pipeline
+        carries downstream -- the gap this migration closes.
+      metadata:
+        owner: "RVU Data Platform"
+        owner_team: "team:rvu-data-platform"
+        tier: "tier_1"
+        domain: "legacy_orchestration"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: >-
+          ADF-orchestrated legacy ingestion, superseded by the
+          Fivetran+dbt pipeline once the BigQuery migration completes --
+          shown side by side here, not chained into it, because this
+          rebuild replaces it rather than running alongside it long-term.
+        business_impact: >-
+          Azure Data Factory can confirm this job ran. It has no
+          asset-level signal on whether the data it copied was
+          correct -- click through to raw_panel_insurer_feed or
+          fct_bound_policies_daily on the new side for the contrast.
+        deployment_mode: "demo_mode=true; set false + real Azure credentials for production"

@@ -12,11 +12,28 @@ Say: *"You told us Azure Data Factory can tell you a job ran, but not
 whether the data coming out of it was good. That's the whole demo — I'm
 going to show you the difference."*
 
-## 1. The money shot — the full graph, green
+## 1. Click the legacy ADF asset first — the incumbent, on screen
 
-1. Open the asset graph in `dg dev` (http://localhost:3000). Group by
-   `ingestion` / `dbt` / `activation` / `reporting` so Fivetran → dbt →
-   Braze/Power BI reads left to right.
+1. In the asset graph, filter to the `legacy_orchestration` group. Click
+   `adf_pipeline_legacy_nightly_ingestion`.
+2. Materialize it. Say: *"This is your actual ADF pipeline, represented
+   as a real Dagster asset using our Azure Data Factory integration — not
+   a slide, not a metadata label. It ran, it succeeded, it took a few
+   minutes. That's everything ADF can tell you about it."*
+3. Open its metadata panel. Point out there is **no check, no freshness
+   policy, nothing about the data it moved** — only that the job ran. Say:
+   *"This is the gap, made concrete. Now watch what the same kind of
+   pipeline looks like once Dagster owns it."*
+4. Open the Sensors tab, point at `legacy_orchestration_observation_sensor`.
+   Say: *"And this isn't even the only way we'd know about this pipeline
+   — if RVU's own scheduler kicks it off outside Dagster tonight, this
+   sensor picks that run up too. You don't lose visibility just because
+   Dagster didn't start it."*
+
+## 2. The money shot — the new pipeline, green, checked
+
+1. Switch to the `ingestion` / `dbt` / `activation` / `reporting` groups so
+   Fivetran → dbt → Braze/Power BI reads left to right.
 2. Point out the ingestion layer is badged `fivetran` (their real, named
    tool), the dbt layer `dbt`+`bigquery` (their two locked decisions), and
    downstream `braze`/`powerbi`.
@@ -28,11 +45,13 @@ going to show you the difference."*
    is the same code path that runs against your live Fivetran account and
    BigQuery warehouse once we swap in your credentials."*
 
-## 2. Click `fct_bound_policies_daily`
+## 3. Click `fct_bound_policies_daily`
 
 1. Open its metadata panel. Point at the **freshness policy** and the
    passing **checks** in the same panel — dbt-derived tests plus the custom
-   reconciliation check.
+   reconciliation check. Say: *"Compare this panel to the ADF pipeline you
+   just saw — same kind of nightly job, but now there's a checked,
+   freshness-tracked, per-asset story underneath it."*
 2. Say: *"If this check had failed — say the panel feed went quiet and the
    aggregation silently dropped rows — only this one materialization would
    be blocked. Not the whole job."* This directly reverses Iain's own line:
@@ -43,7 +62,7 @@ going to show you the difference."*
    Say: *"Every number downstream has a visible, checked path back to the
    Fivetran sync it came from."*
 
-## 3. Click into the dbt project directly
+## 4. Click into the dbt project directly
 
 1. Open `stg_bound_policies`'s metadata panel — show the raw SQL and the
    auto-surfaced `not_null`/`unique` tests. Say: *"This is your actual dbt
@@ -53,7 +72,7 @@ going to show you the difference."*
    your BigQuery credentials. Flipping to your real warehouse is a
    `profiles.yml` target change — same models, same tests, same graph."*
 
-## 4. Branch deployments against BigQuery — Iain's own mechanical question
+## 5. Branch deployments against BigQuery — Iain's own mechanical question
 
 1. Open a second, empty branch deployment in Dagster+ pointed at the same
    project.
@@ -64,7 +83,7 @@ going to show you the difference."*
 3. This is the direct answer to *"changes cannot be tested safely before
    hitting production"* — one of Lisa's named pains.
 
-## 5. Automation and schedule
+## 6. Automation and schedule
 
 1. Open any dbt-layer asset (e.g. `stg_quote_requests`). Show its `eager`
    automation condition. Say: *"The moment a new Fivetran sync lands, this
@@ -75,16 +94,15 @@ going to show you the difference."*
    stops here, not three steps downstream."*
 3. Point at `rvu_morning_marts_schedule` in the Schedules tab.
 
-## 6. Fivetran's own schedule, observed
+## 7. Fivetran's own schedule, observed
 
 1. Open the Sensors tab and point at
    `fivetran_rvu_demo_account__sync_status_sensor`. Say: *"Fivetran syncs
    on its own schedule too — this polls for syncs Fivetran ran that Dagster
    didn't trigger, and folds them into the same lineage graph as an
-   observation. You don't lose visibility just because something else
-   started the run."*
+   observation. Same pattern you just saw on the ADF side."*
 
-## 7. What Dagster+ adds on top (don't build it live — point at it)
+## 8. What Dagster+ adds on top (don't build it live — point at it)
 
 Say: *"None of what's coming next is code I wrote for this demo — it's
 just there:"*
@@ -100,14 +118,14 @@ just there:"*
 4. **Insights dashboard** — observability over time, once this is running
    in production.
 
-## 8. Close
+## 9. Close
 
 Say: *"Everything you saw today — the dbt tests, the freshness policy, the
-lineage, the Fivetran and Power BI integrations — works identically the
-day this points at your real Fivetran account, Power BI workspace, and
-BigQuery project instead of local simulations. That's the whole point of
-building it this way: nothing about the orchestration logic changes when
-the credentials do."*
+lineage, the ADF/Fivetran/Power BI integrations — works identically the
+day this points at your real Azure Data Factory, Fivetran account, Power
+BI workspace, and BigQuery project instead of local simulations. That's
+the whole point of building it this way: nothing about the orchestration
+logic changes when the credentials do."*
 
 Then, to Iain directly: *"You've got the technical case now. What do you
 need from me to help you make the cost case to Tom?"*
@@ -121,3 +139,6 @@ need from me to help you make the cost case to Tom?"*
   ground between full SaaS and self-hosting; described, not built.
 - No assets for RVU's other four brands (Uswitch, Confused.com,
   money.co.uk, Mojo Mortgages) — this rebuild is scoped to Tempcover.
+- The legacy ADF pipeline is shown side by side with the new pipeline for
+  contrast, not chained into its lineage — it's being replaced, not kept
+  running alongside it long-term.
