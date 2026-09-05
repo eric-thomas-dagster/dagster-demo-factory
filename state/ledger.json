@@ -1,15 +1,20 @@
 {
-  "brief-ready": [
+  "brief-ready": [],
+  "built": [
     {
       "company": "E.ON Sverige",
       "slug": "eon-sverige",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "2026-09-17",
       "brief_path": "briefs/2026-09-17-eon-sverige.md",
-      "timestamp": "2026-09-04T20:30:00Z"
-    }
-  ],
-  "built": [
+      "timestamp": "2026-09-04T20:30:00Z",
+      "deployed_at": "2026-09-05T06:13:00Z",
+      "location_name": "demo-eon-sverige",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/20",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-eon-sverige",
+      "note": "Graph-first, always-green build ('Grid at Scale') for a 60-minute Demo/Deeper Dive with no AE discovery notes at all -- brief built entirely from public grid-investment/smart-meter-rollout signal and EU Implementing Regulation 2026/855, confidence flagged low throughout. 8 assets across metering_ingestion/grid_quality/customer_switching_compliance/grid_reporting groups, matching the brief's own explicit 8-item enumeration rather than its separate '~10-12' sizing note (same resolution as the Trafigura build's identical mismatch). Reused detroit-dwsd's GraphFirstAssetsComponent verbatim (no-op bodies -- no stack layer is confirmed for E.ON, so no kinds badges anywhere), adding one new meter_reads_partitions template var (MultiPartitionsDefinition of date x Sweden's real SE1-SE4 national grid bidding zones, used as a generic region dimension) for the brief's multi-region meter rollout. 3 blocking checks, 1 freshness policy on grid_load_hourly, eager automation gated on upstream blocking checks for the compliance chain, one daily telemetry schedule (native build_schedule_from_partitioned_job, same registry gap as the DWSD build). Project directory renamed from the initial demos/eon_sverige (matching the Python package name) to demos/eon-sverige mid-build to match the ledger/brief slug convention scripts/reset_demo.sh, pull_demo.sh, and request.sh all assume. Full validation gate green (dg check defs/yaml, dg list defs/components, validate_e2e.py across multi-partitioned/daily-partitioned/unpartitioned chains); verified zero-setup from a fresh clone; deployed and independently confirmed LOADED via dg api."
+    },
     {
       "company": "Noleggiare (FTH Group)",
       "slug": "noleggiare",

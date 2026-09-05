@@ -71,9 +71,6 @@ instead of discovering them one deploy cycle at a time.
 
 ## CLI
 
-- **Use `dg`, never the legacy `dagster` CLI.** `dg dev` not `dagster dev`;
-  `dg launch --assets '*'` not `dagster asset materialize --select '*'`. The
-  flag differs too: `--assets` vs `--select`. (dagster-dg-cli 1.13.19)
 - `dg launch` options: `--assets`, `--job`, `--partition`,
   `--partition-range <start>...<end>`, `--config` / `--config-json`.
 - **`dg launch --assets '*'` cannot validate a partitioned project** — it exits
@@ -206,6 +203,24 @@ instead of discovering them one deploy cycle at a time.
 - **A component name must identify a system or domain concept**, never a
   technique. `GraphFirstAsset` / `DemoAsset` / `StubComponent` / `MockAsset` are
   always wrong — Dagster already has assets. (2026-08-27)
+
+## Partitions
+
+- **`dg.MultiPartitionKey({"dim1": "...", "dim2": "..."})` works directly as
+  the `partition_key` argument to `job.execute_in_process(...)`** — no extra
+  conversion needed. Its string form renders as `dim1_value|dim2_value`
+  (order follows the dict passed to `MultiPartitionsDefinition`). Confirmed
+  building `validate_e2e.py` against a date x zone `MultiPartitionsDefinition`
+  (E.ON Sverige, dagster 1.13.21, 2026-09-05).
+- **`GraphFirstAssetsComponent` (see "Never invent a generic..." in
+  CLAUDE.md for the naming rule it's the sanctioned exception to) works
+  unmodified across mixed partition schemes in one graph** — a
+  `MultiPartitionsDefinition` asset, a plain daily-partitioned asset, and
+  unpartitioned assets all downstream of each other via ordering-only
+  `deps:` edges, with zero partition-mapping config, because no asset body
+  actually reads its upstream's data. Reused verbatim from the City of
+  Detroit DWSD build onto E.ON Sverige, adding only one new
+  `@template_var` for the extra partition dimension. (2026-09-05)
 
 ## Dead ends
 

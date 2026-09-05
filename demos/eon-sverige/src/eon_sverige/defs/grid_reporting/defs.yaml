@@ -1,0 +1,32 @@
+type: eon_sverige.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: daily_grid_health_summary
+      deps: ["grid_load_hourly", "validated_meter_reads"]
+      group_name: grid_reporting
+      owners: ["team:grid-data-platform"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Daily rollup combining grid-load and meter-read validation status --
+        the one-screen "is today's grid data healthy" answer for
+        operations.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_2"
+        domain: "grid_load"
+
+    - key: regional_meter_coverage_report
+      deps: ["validated_meter_reads"]
+      group_name: grid_reporting
+      owners: ["team:grid-data-platform"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Per-bidding-zone meter reporting-coverage report -- tracks rollout
+        progress across regions as the ~1M-meter NB-IoT replacement lands.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_2"
+        domain: "metering"

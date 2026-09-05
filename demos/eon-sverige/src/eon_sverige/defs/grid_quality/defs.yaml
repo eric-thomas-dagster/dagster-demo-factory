@@ -1,0 +1,41 @@
+type: eon_sverige.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: validated_meter_reads
+      deps: ["raw_meter_reads"]
+      group_name: grid_quality
+      owners: ["team:grid-data-platform"]
+      partitions_def: "{{ meter_reads_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Cleaned, per-zone meter reads -- passed its completeness check
+        before anything downstream (compliance extract, coverage report)
+        is allowed to build on it.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_1"
+        domain: "metering"
+
+    - key: grid_load_hourly
+      deps: ["raw_grid_load_telemetry"]
+      group_name: grid_quality
+      owners: ["team:grid-data-platform"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      freshness_policy: "{{ dg.FreshnessPolicy.time_window(fail_window=datetime.timedelta(hours=6), warn_window=datetime.timedelta(hours=4)) }}"
+      description: >-
+        Hourly grid-load rollup -- the asset E.ON's grid-operations team
+        would page someone about, so it's the one carrying the freshness
+        policy in this graph.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_1"
+        domain: "grid_load"
+        severity: "high"
+        business_impact: >-
+          Stale or out-of-range load data delays detecting a network
+          problem during a grid investment period explicitly framed by
+          leadership as their highest-ever spend.
