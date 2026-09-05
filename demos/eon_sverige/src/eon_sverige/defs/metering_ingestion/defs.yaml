@@ -1,0 +1,40 @@
+type: eon_sverige.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: raw_meter_reads
+      group_name: metering_ingestion
+      owners: ["team:grid-data-platform"]
+      partitions_def: "{{ meter_reads_partitions }}"
+      description: >-
+        Raw interval reads from the smart-meter rollout, one partition per
+        day x grid bidding zone -- the volume this graph has to absorb as
+        the ~1M-meter NB-IoT rollout lands.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_1"
+        domain: "metering"
+        sla: "Full day's reads for a zone expected landed by 06:00 CET the following day."
+        business_impact: >-
+          Feeds billing accuracy and grid-load visibility for every
+          household on that zone's meters; the asset that earns a partition
+          because the rollout makes it arrive per-region, per-day, at scale.
+
+    - key: raw_grid_load_telemetry
+      group_name: metering_ingestion
+      owners: ["team:grid-data-platform"]
+      partitions_def: "{{ daily_partitions }}"
+      description: >-
+        Daily grid load telemetry feeding the network-investment story --
+        the criticality that grows with E.ON Energidistribution's grid
+        build-out.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_1"
+        domain: "grid_load"
+        sla: "Prior day's telemetry expected landed by 05:00 CET."
+        business_impact: >-
+          Physically implausible or missing load data here is a
+          grid-operations blind spot, not just a data-quality nuisance.

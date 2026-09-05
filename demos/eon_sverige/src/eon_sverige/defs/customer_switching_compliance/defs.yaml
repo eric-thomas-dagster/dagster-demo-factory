@@ -1,0 +1,42 @@
+type: eon_sverige.components.GraphFirstAssetsComponent
+
+attributes:
+  assets:
+    - key: customer_switching_extract
+      deps: ["validated_meter_reads"]
+      group_name: customer_switching_compliance
+      owners: ["team:grid-data-platform"]
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Customer-switching data extract, built on validated meter reads --
+        models the transparent, non-discriminatory data-access procedure EU
+        Implementing Regulation 2026/855 requires for switching data.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_1"
+        domain: "customer_switching"
+        severity: "high"
+        business_impact: >-
+          The artifact a regulator or a competing retailer would expect to
+          see produced under EU 2026/855's access-transparency requirement.
+
+    - key: switching_data_audit_log
+      deps: ["customer_switching_extract"]
+      group_name: customer_switching_compliance
+      owners: ["team:grid-data-platform"]
+      automation_condition: "{{ recompute_after_upstream_checks_pass }}"
+      description: >-
+        Asset-level audit metadata for the switching extract -- who/what
+        produced it, when, and against which check results. This is the
+        auditable-procedure story EU 2026/855 asks for, told through the
+        same lineage graph rather than a separate compliance system.
+      metadata:
+        owner: "Grid Data Platform"
+        owner_team: "team:grid-data-platform"
+        tier: "tier_1"
+        domain: "customer_switching"
+        severity: "high"
+        business_impact: >-
+          Never rebuilds off an extract whose own audit-completeness check
+          failed -- the concrete answer to "can you prove this was audited."
