@@ -31,8 +31,8 @@ component," and never a spec for integrating a specific tool.
 
 ## Deployment packaging — check before deploying
 
-`./scripts/preflight_deploy.sh <slug>` checks all of these in ~20s. Use it
-instead of discovering them one deploy cycle at a time.
+`./scripts/preflight_deploy.sh <slug> <package_name>` checks all of these in
+~20s. Use it instead of discovering them one deploy cycle at a time.
 
 - `pex` must be installed, or `--build-method local` fails immediately.
 - `dagster-cloud` must be a project dependency, not just a CLI on PATH.
@@ -77,34 +77,37 @@ instead of discovering them one deploy cycle at a time.
   with "Asset has partitions, but no '--partition' option was provided". Every
   build must ship `validate_e2e.py`; `scripts/validate_demo.sh` calls it.
 - `Definitions.resolve_implicit_job_def_def_for_assets(asset_keys)` is the real
-  method name — the doubled `def_def` is not a typo. Delegates to
-  `get_repository_def().get_implicit_job_def_for_assets()`. (dagster, verified
-  2026-08-24)
+  method name — the doubled `def_def` is not a typo.
 - `dagster-component init` does **not** scaffold a project — it writes AI-tool
   config and wires the `registry_modules` entry point into an existing one. Run
   `create-dagster project` first.
 - Pass `--auto-install` to `dagster-component init` / `add`, or they prompt and
   hang forever unattended.
-- The `dagster-community-components-cli` README is stale; the package also has
-  `init`, `sync-deps`, `analyze-schedules`. Check `--help`. (0.8.15)
 - `dagster-component search` takes **one positional argument**. Multiple
   positional terms are rejected. Put several terms *inside* one quoted string —
-  they're AND-ed across id, name, description, tags, keywords, agent_hints:
-  `dagster-component search "fabric pipeline asset" --json`. `--json` returns
-  `{id, score, matched_fields, matched_terms, category, produces, description}`.
-  (verified 2026-08-26)
+  they're AND-ed across id, name, description, tags, keywords, agent_hints.
+  `--json` returns `{id, score, matched_fields, matched_terms, category,
+  produces, description, validation_level}`.
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
 
 ## APIs and schemas
 
-- dbt asset `kinds` derive from the manifest's `adapter_type`, so DuckDB badges
-  every model `duckdb`. No `get_kinds` hook — subclass `DagsterDbtTranslator`,
-  override `get_asset_spec(self, manifest, unique_id, project) -> dg.AssetSpec`,
-  and `spec.replace_attributes(kinds={"dbt", "snowflake"})`. (dagster-dbt,
-  verified 2026-08-24)
+- dbt asset `kinds` derive from the manifest's `adapter_type`. No `get_kinds`
+  hook — subclass `DagsterDbtTranslator` (or override `DbtProjectComponent.
+  get_asset_spec`) and `spec.replace_attributes(kinds={"dbt", "<warehouse>"})`.
 - `components/__init__.py` must re-export each component class, or the UI
   Components tab won't list them even when `dg list components` does.
+- **`AssetSpec.with_io_manager_key(key)` sets a system metadata entry that
+  determines the built op's output Dagster type** (`Any` if present, else
+  `Nothing`). If you then call `.replace_attributes(metadata={**spec.metadata,
+  ...})` using the *pre*-`with_io_manager_key` spec's `.metadata` instead of
+  the post-call spec's, you silently drop that system key — the output type
+  reverts to `Nothing` and a real DataFrame return raises
+  `DagsterTypeCheckError: The truth value of a DataFrame is ambiguous` at
+  runtime, not at `dg check defs`. Always chain metadata merges off the
+  *latest* spec variable, never the original. (verified 2026-09-10, building
+  demos/partners-fcu's `WarehouseTableAssetsComponent`)
 
 ## Project config
 
@@ -120,113 +123,56 @@ instead of discovering them one deploy cycle at a time.
   prompts. Draft + mobile push; never report the missing send as a failure.
 - Cloud env vars are **not** visible to the setup script — session shell only.
 - Briefs and `state/ledger.json` must live on `main`; anything on an unmerged
-  branch is invisible to Factory and the run silently no-ops.
+  branch is invisible to Factory and the run silently no-ops. If a `git fetch
+  origin <ref1> <ref2>` fails because one ref doesn't resolve, the **whole**
+  fetch aborts silently on the other ref too — fetch (or check) each ref
+  separately before concluding a branch is missing upstream content.
 
 ## Registry behaviour and conventions
 
-- **Never assert a registry gap without searching.** A 2026-08-26 run wrote a
-  custom cron-schedule component stating "nothing to search the registry for" —
-  `cron_schedule` exists. The registry includes thin wrappers over core Dagster
-  calls, so "this is core Dagster" is not evidence of absence. Search, always,
-  with `--json`. (2026-08-26)
-- Use the **workspace-style** component with an explicit mapping table in
-  `defs.yaml`, not one instance per external object. Reference:
-  `github.com/eric-thomas-dagster/databricks-workspace-bundles-demo`
-  (`assets_by_task_key` in `defs/workspace_us/defs.yaml`). (2026-08-26)
-- **Workspace components share one convention**: `@public` class,
+- **Never assert a registry gap without searching, with `--json`, every time.**
+  The registry includes thin wrappers over core Dagster calls, so "this is core
+  Dagster" is not evidence of absence.
+- Prefer a **workspace-style** component with an explicit mapping table in
+  `defs.yaml` over one instance per external object (`assets_by_task_key` and
+  its equivalents). Reference: `github.com/eric-thomas-dagster/
+  databricks-workspace-bundles-demo`.
+- **Workspace-style components share one convention**: `@public` class,
   `translation:` field, `@public get_asset_spec(props)` override hook,
   `polling_sensor` (alias `generate_sensor`), `defs_state` +
-  `defs_state_config`, `StateBackedComponent` inheritance. Holds for
-  `FabricWorkspaceComponent`, `FivetranAccountComponent`,
-  `SnowflakeWorkspaceComponent`, `MLflowWorkspaceComponent`,
-  `DatabricksWorkspaceComponent`, `PowerBIWorkspaceComponent`,
-  `AzureDataFactoryComponent`. (verified 2026-08-26, 2026-09-03)
-- **Observation sensors usually default to OFF** (`polling_sensor`/
-  `generate_sensor: false`) — check every workspace component's actual
-  default before assuming, though: `AzureDataFactoryComponent` is a
-  confirmed exception, defaulting **True**. Read the field, don't assume
-  the convention. (2026-08-26, corrected 2026-09-03)
-- `StateBackedComponent` enumeration happens in the **state-write path**, so no
-  HTTP fires at Dagster load time. "It queries a live connection at load time"
-  is not a valid reason to reject one. (2026-08-26)
-- **Not every workspace component exposes an overridable execute method**
-  (`FivetranAccountComponent.execute()` and `PowerBIWorkspaceComponent.
-  build_semantic_model_refresh_asset_definition()` do; `AzureDataFactoryComponent`
-  inlines its trigger-and-poll logic in a private module function calling a
-  private free function, `_get_adf_client`, with no override point).
-  Fallback seam: monkeypatch the module-level free function for the
-  process's lifetime when `demo_mode=True` — a scoped patch-and-restore
-  doesn't work, since generated sensor/asset closures resolve it from
-  module globals at *call* time, not definition time. Also: its
-  `assets_by_pipeline_name` overrides a pipeline's spec `key:`, but its
-  observation sensor re-derives `asset_key` from the raw object name
-  instead of the override, so a key override there produces a dangling
-  observation — verify by evaluating the sensor directly, not just
-  `dg list defs`. See `component-feedback/2026-09-03-azure-data-factory-demo-mode-seam.md`.
-  (verified 2026-09-03)
-- **Azure SDK / msrest models coerce naive datetimes to UTC-aware on
-  assignment** (`azure.mgmt.datafactory.models.RunFilterParameters` does
-  this) — a demo-mode fixture comparing its own naive timestamps against
-  those fields raises `TypeError: can't compare offset-naive and
-  offset-aware datetimes`. Give any Azure-SDK-backed fixture UTC-aware
-  timestamps from the start. (verified 2026-09-03)
-
-## Don't rebuild platform features
-
-- Dagster+ has **native alert policies** for Slack, Teams, email, and
-  PagerDuty, covering run failures, asset check failures, freshness violations,
-  and schedule/sensor failures. Never hand-roll alerting in a demo — it implies
-  the platform lacks something it has. Show it in the UI instead. (2026-08-25)
-
+  `defs_state_config`, `StateBackedComponent` inheritance — enumeration happens
+  in the state-write path, so "it queries a live connection at load time" is
+  not a valid objection. Plain resource/IO-manager components (e.g.
+  `mssql_io_manager`) do **not** follow this convention — it's specific to
+  components that trigger/observe external jobs, not to persistence.
+- **A component's default for its observation/polling-sensor field varies by
+  component — read the field, don't assume the convention default (off) holds
+  everywhere.**
 - Jobs: use `define_asset_job` with `AssetSelection`. Never call asset functions
-  inside a job definition. (2026-08-26)
-
+  inside a job definition.
 - **Verify each feature-floor item actually appears in `dg list defs --json`.**
-  A component declaring a config field does not mean it builds anything from it
-  — a registry component with a `polling_sensor` field that never wired a sensor
-  silently sank three consecutive builds. Confirm presence in the definitions
-  listing; don't assume the component honoured its own config. (2026-08-26)
+  A component declaring a config field does not mean it builds anything from
+  it — confirm presence in the definitions listing, don't assume the component
+  honoured its own config.
 - Read the most recent successful project in `demos/` for established
-  conventions (warehouse setup, check style, README shape) before inventing your
-  own. Cheap, and it keeps builds consistent. (2026-08-26)
-
-- **Never route an external system through a home-made component**, and check
-  *every* system, not just the easy ones — partial compliance (3 of 4 systems
-  right) reads as success and hides the gap. **The system named in the demo
-  thesis is the one most likely to be missed and the one that matters most.**
-  rvu-tempcover needed three builds: home-made component for everything, then
-  Fivetran/Power BI/dbt fixed but the thesis's own named incumbent (ADF) left
-  as prose — even after this rule was already written down once. Check the
-  system-to-component-ID mapping against the brief's thesis sentence
-  specifically, every build; writing the rule down once isn't sufficient.
-  (2026-09-04, reconfirmed 2026-09-03)
-- **A component name must identify a system or domain concept**, never a
-  technique. `GraphFirstAsset` / `DemoAsset` / `StubComponent` / `MockAsset` are
-  always wrong — Dagster already has assets. (2026-08-27)
+  conventions (warehouse setup, check style, README shape) before inventing
+  your own. Cheap, and it keeps builds consistent.
 
 ## Partitions
 
 - **`dg.MultiPartitionKey({"dim1": "...", "dim2": "..."})` works directly as
   the `partition_key` argument to `job.execute_in_process(...)`** — no extra
-  conversion needed. Its string form renders as `dim1_value|dim2_value`
-  (order follows the dict passed to `MultiPartitionsDefinition`). Confirmed
-  building `validate_e2e.py` against a date x zone `MultiPartitionsDefinition`
-  (E.ON Sverige, dagster 1.13.21, 2026-09-05).
-- **`GraphFirstAssetsComponent` (see "Never invent a generic..." in
-  CLAUDE.md for the naming rule it's the sanctioned exception to) works
-  unmodified across mixed partition schemes in one graph** — a
-  `MultiPartitionsDefinition` asset, a plain daily-partitioned asset, and
-  unpartitioned assets all downstream of each other via ordering-only
-  `deps:` edges, with zero partition-mapping config, because no asset body
-  actually reads its upstream's data. Reused verbatim from the City of
-  Detroit DWSD build onto E.ON Sverige, adding only one new
-  `@template_var` for the extra partition dimension. (2026-09-05)
-
-## Dead ends
-
-- **Never plant a failure in a demo.** No anomalies, corrupt partitions, or
-  missing data — not behind a flag. A demo that can fail will fail live, on the
-  path nobody rehearsed. Build the checks and explain what they'd catch in
-  production, against a green graph. Corollary: nothing to heal, so no heal
-  asset, heal job, or reset object; a disconnected `healed_partitions` node
-  reads as scaffolding. Briefs cannot override this. (2026-08-25)
+  conversion needed. Its string form renders as `dim1_value|dim2_value` (order
+  follows the dict passed to `MultiPartitionsDefinition`).
+- A downstream asset can depend via a plain `deps=` edge on an upstream asset
+  with a **completely different (or absent) `partitions_def`**, with zero
+  `PartitionMapping` config, as long as no asset body actually reads the
+  upstream's partition-scoped data — confirmed across mixed multi-partitioned /
+  daily-partitioned / unpartitioned chains in the same graph (demos/eon-sverige,
+  demos/detroit-dwsd).
+- **dbt models can be a small full-refresh transform over the whole
+  accumulated raw window, with Dagster's partition bookkeeping on the mart
+  independent of dbt's own execution grain** — i.e. the SQL doesn't need to
+  filter to `{{ partition_key }}` for the Dagster partition to still be
+  tracked correctly. Reused across demos/rvu-tempcover, demos/kapitus,
+  demos/partners-fcu.
