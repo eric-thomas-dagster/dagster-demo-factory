@@ -1,0 +1,32 @@
+type: partners_fcu.components.PartnersFcuDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts_daily
+  select: "fct_daily_member_activity fct_loan_portfolio_summary"
+  translation:
+    group_name: dbt
+    partitions_def: "{{ daily_partitions_def }}"
+    owners: ["team:partners-fcu-data-platform"]
+    metadata:
+      owner: "Partners FCU Data Platform"
+      owner_team: "team:partners-fcu-data-platform"
+      tier: "tier_1"
+      domain: "member_activity"
+
+post_processing:
+  assets:
+    - target: "marts/fct_daily_member_activity"
+      attributes:
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ daily_freshness }}"
+        metadata:
+          business_impact: "The asset Partners FCU's BI team would page someone about -- their own explicit ask, 'talk through partitioned assets.'"
+          severity: "high"
+    - target: "marts/fct_loan_portfolio_summary"
+      attributes:
+        automation_condition: "{{ eager }}"

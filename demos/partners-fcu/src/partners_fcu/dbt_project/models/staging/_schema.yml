@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: stg_member_transactions
+    description: "Typed member transactions, ready for daily activity rollups."
+    columns:
+      - name: transaction_id
+        data_tests: [unique, not_null]
+      - name: member_id
+        data_tests: [not_null]
+      - name: amount
+        data_tests: [not_null]
+
+  - name: stg_deposit_accounts
+    description: "Typed deposit account snapshot."
+    columns:
+      - name: account_id
+        data_tests: [unique, not_null]
+      - name: member_id
+        data_tests: [not_null]
+
+  - name: stg_loan_originations
+    description: "Typed loan originations."
+    columns:
+      - name: loan_id
+        data_tests: [unique, not_null]
+      - name: member_id
+        data_tests: [not_null]
+      - name: principal_amount
+        data_tests: [not_null]

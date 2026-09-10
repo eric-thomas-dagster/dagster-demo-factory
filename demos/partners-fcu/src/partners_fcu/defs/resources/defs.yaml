@@ -1,0 +1,15 @@
+type: partners_fcu.components.DemoMSSQLIOManagerComponent
+
+attributes:
+  resource_key: mssql_io_manager
+  demo_mode: true
+
+  # Never called in demo mode -- a placeholder is enough (the real
+  # MSSQLIOManagerComponent's field is a required string, so an unset
+  # `{{ env.VAR }}` would fail to resolve). To run against Partners FCU's
+  # real SQL Server instance: set demo_mode to false and export
+  # MSSQL_URL as a real SQLAlchemy connection string
+  # (mssql+pymssql://user:pwd@host:1433/db).
+  connection_url_env_var: MSSQL_URL
+  schema_name: raw
+  if_exists: replace

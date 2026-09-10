@@ -1,0 +1,17 @@
+name: "partners_fcu"
+version: "1.0.0"
+config-version: 2
+
+profile: "partners_fcu"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  partners_fcu:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
