@@ -1,15 +1,20 @@
 {
-  "brief-ready": [
+  "brief-ready": [],
+  "built": [
     {
       "company": "Partners Federal Credit Union",
       "slug": "partners-fcu",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "2026-09-10",
       "brief_path": "briefs/2026-09-10-partners-fcu.md",
-      "timestamp": "2026-09-09T22:45:00Z"
-    }
-  ],
-  "built": [
+      "timestamp": "2026-09-09T22:45:00Z",
+      "deployed_at": "2026-09-10T06:35:00Z",
+      "location_name": "demo-partners-fcu",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/21",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-partners-fcu",
+      "note": "Build-a-pipeline demo ('Dependencies, Not Duct Tape') for a re-engagement 'Pro vs. OSS' meeting after a stalled year-old Dagster OSS pilot -- answers the brief's three named asks (alerting, quality checks, partitioned assets) directly. 10 assets: 3 SQL-Server-badged daily-partitioned raw ingestion assets via the real registry mssql_io_manager component (subclassed as DemoMSSQLIOManagerComponent for a demo-mode DuckDB-backed I/O-boundary swap, per templates/demo_mode_pattern.py's resource-seam variant), 6 dbt assets (real dbt Core, staging+marts, badged dbt+snowflake via a DbtProjectComponent subclass overriding get_asset_spec -- Snowflake per the AE's 'likely adding' framing, flagged as an assumption), 1 plain reporting asset with no kind badge (no BI tool named anywhere in the brief). Two blocking completeness checks (raw_member_transactions, raw_loan_originations) plus 13 dbt-native tests plus one warning reconciliation check, all real and green; one freshness policy on fct_daily_member_activity; eager automation on the dbt layer gated on the two blocking checks for their direct dependents; one 06:00 America/New_York morning schedule (assumed timezone/hour, not stated in the brief). WarehouseTableAssetsComponent (same accepted pattern as demos/noleggiare) supplies the small deterministic stub bodies the raw layer writes through the real IO manager -- Axis 1 requires genuine I/O for the blocking checks and dbt sources to have something real to query, even though Axis 2 fidelity is graph-first per the brief. No custom component was needed (mssql_io_manager covered the only external system in scope), so no component-feedback/ entry. Full validation gate green (dg check defs/yaml, dg list defs/components, validate_e2e.py across partitioned/unpartitioned chains, 19 checks all evaluated and passing); verified zero-setup from a genuine fresh git clone; deployed and independently confirmed LOADED via dg api. One transient PEX-build network timeout on the first deploy attempt (files.pythonhosted.org read timeout), succeeded cleanly on retry -- not a packaging bug."
+    },
     {
       "company": "E.ON Sverige",
       "slug": "eon-sverige",
