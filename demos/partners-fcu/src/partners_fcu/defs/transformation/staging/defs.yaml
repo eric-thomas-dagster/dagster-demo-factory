@@ -1,0 +1,33 @@
+type: partners_fcu.components.PartnersFcuDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_staging
+  select: "stg_member_transactions stg_deposit_accounts stg_loan_originations dim_member"
+  translation:
+    group_name: dbt
+    owners: ["team:partners-fcu-data-platform"]
+    metadata:
+      owner: "Partners FCU Data Platform"
+      owner_team: "team:partners-fcu-data-platform"
+      tier: "tier_1"
+      domain: "member_activity"
+
+post_processing:
+  assets:
+    - target: "staging/stg_member_transactions"
+      attributes:
+        automation_condition: "{{ eager_after_member_transactions_check }}"
+    - target: "staging/stg_deposit_accounts"
+      attributes:
+        automation_condition: "{{ eager }}"
+    - target: "staging/stg_loan_originations"
+      attributes:
+        automation_condition: "{{ eager_after_loan_originations_check }}"
+    - target: "marts/dim_member"
+      attributes:
+        automation_condition: "{{ eager }}"

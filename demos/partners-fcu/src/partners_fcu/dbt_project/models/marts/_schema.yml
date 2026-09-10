@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: dim_member
+    description: "One row per member seen across transactions, deposits, or loans."
+    columns:
+      - name: member_id
+        data_tests: [unique, not_null]
+
+  - name: fct_daily_member_activity
+    description: "Daily member transaction volume and dollar activity -- the asset a BI team would page someone about."
+    columns:
+      - name: transaction_date
+        data_tests: [unique, not_null]
+
+  - name: fct_loan_portfolio_summary
+    description: "Daily loan origination volume and principal, by loan type."
+    columns:
+      - name: origination_date
+        data_tests: [not_null]

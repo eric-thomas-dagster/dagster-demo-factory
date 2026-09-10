@@ -1,0 +1,23 @@
+partners_fcu:
+  target: "{{ env_var('PARTNERS_FCU_DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # `__init__.py` sets this env var to a working project-relative
+      # default (`demo_data/demo.duckdb` -- the same file
+      # `DemoMSSQLIOManagerComponent` writes the raw ingestion layer into)
+      # before Dagster loads any defs, so this always resolves with zero
+      # manual setup. Override it to point dbt at a different DuckDB file
+      # without touching this profile.
+      path: "{{ env_var('PARTNERS_FCU_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    live:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: "marts"
+      threads: 4

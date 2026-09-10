@@ -1,0 +1,62 @@
+type: partners_fcu.components.WarehouseTableAssetsComponent
+
+attributes:
+  io_manager_key: mssql_io_manager
+
+  assets:
+    - key: raw_member_transactions
+      group_name: ingestion
+      kinds: ["mssql"]
+      partitions_def: "{{ daily_partitions }}"
+      owners: ["team:partners-fcu-data-platform"]
+      description: >-
+        Daily member transaction feed from Partners FCU's core SQL Server
+        system -- the source whose ordering/dependency workarounds cause
+        the pain named in this meeting today.
+      metadata:
+        owner: "Partners FCU Data Platform"
+        owner_team: "team:partners-fcu-data-platform"
+        tier: "tier_1"
+        domain: "member_transactions"
+        deployment_mode: "self-hosted SQL Server (current, on-prem)"
+        business_impact: >-
+          Feeds daily member-activity reporting and every downstream
+          reconciliation check in this demo.
+        demo_row_count: 1200
+
+    - key: raw_deposit_accounts
+      group_name: ingestion
+      kinds: ["mssql"]
+      partitions_def: "{{ daily_partitions }}"
+      owners: ["team:partners-fcu-data-platform"]
+      description: >-
+        Daily snapshot of deposit account balances and status from Partners
+        FCU's core SQL Server system.
+      metadata:
+        owner: "Partners FCU Data Platform"
+        owner_team: "team:partners-fcu-data-platform"
+        tier: "tier_1"
+        domain: "deposit_accounts"
+        deployment_mode: "self-hosted SQL Server (current, on-prem)"
+        demo_row_count: 450
+
+    - key: raw_loan_originations
+      group_name: ingestion
+      kinds: ["mssql"]
+      partitions_def: "{{ daily_partitions }}"
+      owners: ["team:partners-fcu-data-platform"]
+      description: >-
+        Daily loan origination feed from Partners FCU's core SQL Server
+        system -- loans originate far less frequently than member
+        transactions, so this table's daily volume is much lower.
+      metadata:
+        owner: "Partners FCU Data Platform"
+        owner_team: "team:partners-fcu-data-platform"
+        tier: "tier_1"
+        domain: "loan_originations"
+        deployment_mode: "self-hosted SQL Server (current, on-prem)"
+        business_impact: >-
+          The blocking completeness check on this asset is the direct
+          reversal of "workarounds to get jobs to run in the right order" --
+          the dbt layer refuses to compute on an incomplete origination feed.
+        demo_row_count: 35

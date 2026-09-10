@@ -1,0 +1,18 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: raw_member_transactions
+        meta:
+          dagster:
+            asset_key: ["raw_member_transactions"]
+      - name: raw_deposit_accounts
+        meta:
+          dagster:
+            asset_key: ["raw_deposit_accounts"]
+      - name: raw_loan_originations
+        meta:
+          dagster:
+            asset_key: ["raw_loan_originations"]
