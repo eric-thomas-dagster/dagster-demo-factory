@@ -1,5 +1,14 @@
 {
-  "brief-ready": [],
+  "brief-ready": [
+    {
+      "company": "Umicore",
+      "slug": "umicore",
+      "status": "brief-ready",
+      "demo_date": "TBD",
+      "brief_path": "briefs/2026-09-11-umicore.md",
+      "timestamp": "2026-09-11T22:40:00Z"
+    }
+  ],
   "built": [
     {
       "company": "Partners Federal Credit Union",
