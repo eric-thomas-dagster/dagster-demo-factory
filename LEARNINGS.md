@@ -90,6 +90,11 @@ component," and never a spec for integrating a specific tool.
   produces, description, validation_level}`.
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
+- **`dg check defs` / `dg list defs` can transiently fail with
+  `ModuleNotFoundError: No module named '<pkg>'`** on the very first
+  invocation right after `uv sync` or `uv pip install -e .` — retry once
+  before treating it as a real error; it consistently succeeds on the
+  second call. (verified 2026-09-12, demos/umicore, reproduced 3×)
 
 ## APIs and schemas
 
@@ -100,14 +105,16 @@ component," and never a spec for integrating a specific tool.
   Components tab won't list them even when `dg list components` does.
 - **`AssetSpec.with_io_manager_key(key)` sets a system metadata entry that
   determines the built op's output Dagster type** (`Any` if present, else
-  `Nothing`). If you then call `.replace_attributes(metadata={**spec.metadata,
-  ...})` using the *pre*-`with_io_manager_key` spec's `.metadata` instead of
-  the post-call spec's, you silently drop that system key — the output type
-  reverts to `Nothing` and a real DataFrame return raises
-  `DagsterTypeCheckError: The truth value of a DataFrame is ambiguous` at
-  runtime, not at `dg check defs`. Always chain metadata merges off the
-  *latest* spec variable, never the original. (verified 2026-09-10, building
-  demos/partners-fcu's `WarehouseTableAssetsComponent`)
+  `Nothing`). Chaining `.replace_attributes(metadata=...)` off the spec
+  *before* that call instead of after silently drops the key and reverts the
+  type to `Nothing` — a real DataFrame return then raises
+  `DagsterTypeCheckError` at runtime, not at `dg check defs`. Always chain
+  metadata merges off the *latest* spec variable.
+- **A component's `ResolvedAssetSpec.key` YAML field is a plain string only**
+  (slash-joined for multi-segment keys, e.g. `"bu/raw_table"`) — unlike
+  `deps:`, which accepts a list of strings. Passing a YAML list for `key:`
+  fails schema validation with "not valid under any of the given schemas"
+  and no clearer message. (verified 2026-09-12, demos/umicore)
 
 ## Project config
 
@@ -127,16 +134,18 @@ component," and never a spec for integrating a specific tool.
   origin <ref1> <ref2>` fails because one ref doesn't resolve, the **whole**
   fetch aborts silently on the other ref too — fetch (or check) each ref
   separately before concluding a branch is missing upstream content.
+- **Prefer `uv add <pkg>` over `pip install <pkg>`** for a dependency whose
+  transitive deps include a package with a legacy setup.py-only sdist (e.g.
+  `dagster-databricks` → `pyspark`) — plain `pip install` fails building the
+  wheel (`AttributeError: install_layout`, a setuptools/legacy-setup.py
+  incompatibility in this environment); `uv add` builds/resolves the same
+  package successfully. (verified 2026-09-12, demos/umicore)
 
 ## Registry behaviour and conventions
 
 - **Never assert a registry gap without searching, with `--json`, every time.**
   The registry includes thin wrappers over core Dagster calls, so "this is core
   Dagster" is not evidence of absence.
-- Prefer a **workspace-style** component with an explicit mapping table in
-  `defs.yaml` over one instance per external object (`assets_by_task_key` and
-  its equivalents). Reference: `github.com/eric-thomas-dagster/
-  databricks-workspace-bundles-demo`.
 - **Workspace-style components share one convention**: `@public` class,
   `translation:` field, `@public get_asset_spec(props)` override hook,
   `polling_sensor` (alias `generate_sensor`), `defs_state` +
@@ -147,16 +156,22 @@ component," and never a spec for integrating a specific tool.
   components that trigger/observe external jobs, not to persistence.
 - **A component's default for its observation/polling-sensor field varies by
   component — read the field, don't assume the convention default (off) holds
-  everywhere.**
+  everywhere.** Some native workspace-style components (e.g. the current
+  `dagster_databricks.DatabricksWorkspaceComponent`) ship with **no
+  observation/polling-sensor field at all**, unlike their siblings
+  (`AzureDataFactoryComponent`, `PowerBIWorkspaceComponent`) — check the
+  component's actual fields before assuming the convention is complete;
+  adding the sensor in a subclass is rung 3, not rung 4. (verified 2026-09-12,
+  demos/umicore)
 - Jobs: use `define_asset_job` with `AssetSelection`. Never call asset functions
   inside a job definition.
 - **Verify each feature-floor item actually appears in `dg list defs --json`.**
   A component declaring a config field does not mean it builds anything from
   it — confirm presence in the definitions listing, don't assume the component
-  honoured its own config.
-- Read the most recent successful project in `demos/` for established
-  conventions (warehouse setup, check style, README shape) before inventing
-  your own. Cheap, and it keeps builds consistent.
+  honoured its own config. Note: this CLI's `--json` output does not surface
+  `partitions_def` or `freshness_policy` at all (any component) — verify those
+  two specifically by loading `Definitions` in Python and checking
+  `assets_def.partitions_def` / `asset_spec.freshness_policy` instead.
 
 ## Partitions
 
