@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: fct_battery_carbon_footprint_inputs
+    description: "Daily battery-materials production inputs feeding the EU Battery Regulation carbon-footprint declaration."
+    columns:
+      - name: production_date
+        data_tests: [unique, not_null]
+      - name: total_output_kg
+        data_tests: [not_null]
+
+  - name: fct_cross_bu_consolidated_ledger
+    description: "One consolidated activity ledger across all four business units -- the untangled version of the cross-BU spiderweb."
+    columns:
+      - name: business_unit
+        data_tests: [not_null]
+      - name: activity_date
+        data_tests: [not_null]
+
+  - name: executive_reporting_extract
+    description: "Corporate executive rollup across all four business units -- the asset a BU or corporate mesh lead would page someone about, and the third job in the 3-job sequential chain the money-shot demo walks."
+    columns:
+      - name: activity_date
+        data_tests: [unique, not_null]
+
+  - name: eu_battery_regulation_carbon_footprint_report
+    description: "Declaration-facing extract of the trustworthy battery-materials inputs -- no footprint calculation logic, per house rules."
+    columns:
+      - name: production_date
+        data_tests: [unique, not_null]

@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: stg_battery_materials
+    description: "Typed battery-materials cathode production batches, ready for carbon-footprint-input rollups."
+    columns:
+      - name: cathode_batch_id
+        data_tests: [unique, not_null]
+      - name: production_line
+        data_tests: [not_null]
+      - name: output_kg
+        data_tests: [not_null]
+
+  - name: stg_catalysis_ac
+    description: "Typed Automotive Catalysts (AC) daily feed."
+    columns:
+      - name: feed_record_id
+        data_tests: [unique, not_null]
+      - name: catalyst_unit_id
+        data_tests: [not_null]
+
+  - name: stg_recycling
+    description: "Typed recycling batch yield."
+    columns:
+      - name: batch_id
+        data_tests: [unique, not_null]
+      - name: recycling_line
+        data_tests: [not_null]
+
+  - name: stg_specialty_materials
+    description: "Typed specialty-materials output."
+    columns:
+      - name: output_id
+        data_tests: [unique, not_null]
+      - name: product_line
+        data_tests: [not_null]

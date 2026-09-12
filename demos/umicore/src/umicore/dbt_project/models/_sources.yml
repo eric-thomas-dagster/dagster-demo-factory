@@ -1,0 +1,22 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: cathode_production_batch
+        meta:
+          dagster:
+            asset_key: ["battery_materials", "raw_cathode_production_batch"]
+      - name: ac_daily_feed
+        meta:
+          dagster:
+            asset_key: ["catalysis", "raw_ac_daily_feed"]
+      - name: recycling_batch_yield
+        meta:
+          dagster:
+            asset_key: ["recycling", "raw_recycling_batch_yield"]
+      - name: specialty_materials_output
+        meta:
+          dagster:
+            asset_key: ["specialty_materials", "raw_specialty_materials_output"]

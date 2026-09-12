@@ -1,0 +1,61 @@
+type: umicore.components.UmicoreDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts
+  select: >-
+    fct_battery_carbon_footprint_inputs fct_cross_bu_consolidated_ledger
+    executive_reporting_extract eu_battery_regulation_carbon_footprint_report
+  translation:
+    partitions_def: "{{ daily_partitions }}"
+    owners: ["team:umicore-digital-transformation"]
+    metadata:
+      owner: "Umicore Digital & Transformation"
+      owner_team: "team:umicore-digital-transformation"
+      tier: "tier_1"
+
+post_processing:
+  assets:
+    - target: "marts/fct_battery_carbon_footprint_inputs"
+      attributes:
+        group_name: battery_materials
+        automation_condition: "{{ eager }}"
+        metadata:
+          domain: "battery_materials"
+          business_impact: >-
+            Feeds the EU Battery Regulation carbon-footprint declaration --
+            gated by a blocking completeness check so the declaration is
+            never built on an incomplete day.
+          severity: "high"
+    - target: "marts/fct_cross_bu_consolidated_ledger"
+      attributes:
+        group_name: corporate_rollup
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ corporate_rollup_freshness }}"
+        metadata:
+          domain: "corporate_rollup"
+          business_impact: >-
+            The untangled version of the cross-BU spiderweb -- one
+            consolidated ledger across all four business units in a single
+            lineage graph.
+          severity: "high"
+    - target: "marts/executive_reporting_extract"
+      attributes:
+        group_name: corporate_rollup
+        automation_condition: "{{ eager }}"
+        metadata:
+          domain: "corporate_rollup"
+          business_impact: >-
+            The third job in Anthony's 3-job sequential chain example --
+            recomputes the moment fct_cross_bu_consolidated_ledger clears,
+            instead of sitting stale until the next scheduled window.
+    - target: "marts/eu_battery_regulation_carbon_footprint_report"
+      attributes:
+        group_name: corporate_rollup
+        automation_condition: "{{ eager }}"
+        metadata:
+          domain: "corporate_rollup"

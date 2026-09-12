@@ -1,0 +1,40 @@
+type: umicore.components.UmicoreDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_staging
+  select: "stg_battery_materials stg_catalysis_ac stg_recycling stg_specialty_materials"
+  translation:
+    group_name: dbt
+    owners: ["team:umicore-digital-transformation"]
+    metadata:
+      owner: "Umicore Digital & Transformation"
+      owner_team: "team:umicore-digital-transformation"
+      tier: "tier_1"
+
+post_processing:
+  assets:
+    - target: "staging/stg_battery_materials"
+      attributes:
+        automation_condition: "{{ eager }}"
+        metadata:
+          domain: "battery_materials"
+    - target: "staging/stg_catalysis_ac"
+      attributes:
+        automation_condition: "{{ eager }}"
+        metadata:
+          domain: "catalysis"
+    - target: "staging/stg_recycling"
+      attributes:
+        automation_condition: "{{ eager }}"
+        metadata:
+          domain: "recycling"
+    - target: "staging/stg_specialty_materials"
+      attributes:
+        automation_condition: "{{ eager_after_specialty_materials_check }}"
+        metadata:
+          domain: "specialty_materials"
