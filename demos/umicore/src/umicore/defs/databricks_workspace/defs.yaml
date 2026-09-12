@@ -1,0 +1,59 @@
+# One DemoDatabricksWorkspaceComponent instance covers every PySpark/Databricks
+# job in the mesh -- adding Umicore's next Databricks-run business unit is one
+# more `assets_by_job_task_key` entry, never another component instance.
+type: umicore.components.DemoDatabricksWorkspaceComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  # Never called in demo mode -- placeholder literals are enough (both
+  # fields are required strings, so an unset `{{ env.VAR }}` would fail to
+  # resolve). To run against Umicore's real Databricks workspace: set
+  # demo_mode to false and replace both lines with
+  # `{{ env.DATABRICKS_HOST }}` / `{{ env.DATABRICKS_TOKEN }}`.
+  workspace:
+    host: "unused-in-demo-mode"
+    token: "unused-in-demo-mode"
+    demo_mode: true
+  generate_sensor: true
+  poll_interval_seconds: 60
+  assets_by_job_task_key:
+    battery_materials_feature_pipeline:
+      extract_cathode_production_batch:
+        - key: "battery_materials/raw_cathode_production_batch"
+          description: >
+            Battery cathode production batches, landed by the
+            battery_materials business unit's own Databricks/PySpark
+            pipeline -- the data product feeding EU Battery Regulation
+            carbon-footprint reporting downstream.
+          group_name: battery_materials
+          partitions_def: "{{ daily_partitions }}"
+          owners: ["team:umicore-battery-materials"]
+          metadata:
+            owner: "Battery Materials Solutions"
+            owner_team: "team:umicore-battery-materials"
+            tier: "tier_1"
+            domain: "battery_materials"
+            deployment_mode: "demo"
+            data_residency: "eu"
+    catalysis_ac_daily_pipeline:
+      extract_ac_daily_feed:
+        - key: "catalysis/raw_ac_daily_feed"
+          description: >
+            Automotive Catalysts (AC) daily feed -- the data product named
+            explicitly in the pain example ("2 hours a day of manual
+            log-checking across disconnected tools with no central log or
+            alert").
+          group_name: catalysis
+          partitions_def: "{{ daily_partitions }}"
+          freshness_policy: "{{ ac_feed_freshness }}"
+          owners: ["team:umicore-catalysis"]
+          metadata:
+            owner: "Catalysis (Automotive Catalysts)"
+            owner_team: "team:umicore-catalysis"
+            tier: "tier_1"
+            domain: "catalysis"
+            deployment_mode: "demo"
+            data_residency: "eu"
+            business_impact: "Feeds the daily manual log-check this demo's checks + alerting replace."
+            severity: "high"

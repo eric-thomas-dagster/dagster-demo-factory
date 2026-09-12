@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/integrations/azure_data_factory/schema.json
+type: umicore.components.DemoAzureDataFactoryComponent
+
+attributes:
+  demo_mode: true
+
+  # Never called in demo mode -- placeholder literals are enough. To point
+  # this at Umicore's real Azure Data Factory: set demo_mode to false and
+  # replace subscription_id/resource_group_name/factory_name with the real
+  # values (Service Principal env vars, or omit them entirely for
+  # DefaultAzureCredential on a managed identity).
+  workspace:
+    subscription_id: "unused-in-demo-mode"
+    resource_group_name: "umicore-legacy-rg"
+    factory_name: "umicore-legacy-adf"
+
+  import_pipelines: true
+  import_triggers: false
+
+  # Detects ADF pipeline runs Stonebranch triggered outside Dagster -- the
+  # concrete answer to "what happens when it wasn't Dagster that started
+  # it." Defaults true on this component already; set explicitly here for
+  # discoverability, per house rules.
+  polling_sensor: true
+  poll_interval_seconds: 60
+
+  group_name: legacy_orchestration
+
+  # The only supported per-pipeline customization hook for pipeline assets
+  # (see components/azure_data_factory_demo.py docstring) -- deliberately
+  # NOT overriding `key:` (the observation sensor re-derives each
+  # observation's asset key from the raw pipeline name rather than honoring
+  # an override, per component-feedback/2026-09-03-azure-data-factory-demo-mode-seam.md,
+  # first found for demos/rvu-tempcover). The pipeline is named
+  # `stonebranch_nightly_mesh_sync`, so the component's own default key
+  # (`adf_pipeline_stonebranch_nightly_mesh_sync`) already reads cleanly
+  # without an override -- and `recycling/raw_recycling_batch_yield`
+  # (defs/generic_raw_layer/defs.yaml) `deps:` on that exact key, so the
+  # graph visibly crosses the legacy/Dagster-owned boundary in one lineage
+  # view, per the brief's most load-bearing directive.
+  assets_by_pipeline_name:
+    stonebranch_nightly_mesh_sync:
+      description: >-
+        Stonebranch-triggered nightly ADF pipeline that copies the
+        recycling business unit's raw extract into the legacy Azure
+        staging tables. Stonebranch (+ Ansible) stays master for this
+        infra-scheduling trigger -- the investment Umicore made roughly
+        two months ago and is not being asked to retire. Dagster observes
+        this pipeline's run history and consumes its output downstream; it
+        never triggers it.
+      metadata:
+        owner: "Umicore Digital & Transformation"
+        owner_team: "team:umicore-digital-transformation"
+        tier: "tier_1"
+        domain: "legacy_orchestration"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: >-
+          Stonebranch/Ansible remains master for infra-deployment
+          scheduling and this nightly ADF copy permanently -- this is not a
+          migration-in-progress boundary like a lift-and-shift, it is the
+          steady-state coexistence the business case argues for. Dagster
+          owns everything on the other side of the boundary: freshness,
+          quality, and cross-business-unit lineage for what this pipeline
+          lands, starting with recycling/raw_recycling_batch_yield.
+        business_impact: >-
+          ADF/Stonebranch can confirm this job ran. It has none of the
+          asset-level checks, freshness policies, or cross-BU lineage the
+          Dagster-owned recycling -> dbt -> corporate-rollup chain carries
+          downstream of it -- click through to
+          recycling/raw_recycling_batch_yield for the contrast.
+        deployment_mode: "demo_mode=true; set false + real Azure credentials for production"
+        control_plane_egress: "none in demo_mode -- real mode calls the Azure Data Factory Management API only"

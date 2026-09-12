@@ -1,0 +1,61 @@
+# One WarehouseTableAssetsComponent instance covers both business units with
+# no ingestion tool named in the brief (recycling, specialty_materials) --
+# adding a fifth no-named-tool business unit is one more `assets:` entry.
+type: umicore.components.WarehouseTableAssetsComponent
+
+attributes:
+  row_count: 60
+  table_names:
+    recycling.raw_recycling_batch_yield: raw.recycling_batch_yield
+    specialty_materials.raw_specialty_materials_output: raw.specialty_materials_output
+
+  assets:
+    - key: "recycling/raw_recycling_batch_yield"
+      deps: ["adf_pipeline_stonebranch_nightly_mesh_sync"]
+      group_name: recycling
+      kinds: ["azure"]
+      partitions_def: "{{ daily_partitions }}"
+      owners: ["team:umicore-recycling"]
+      description: >-
+        Daily recycling batch yield (black-mass recovery from battery and
+        catalyst scrap), landed by the Stonebranch-triggered nightly ADF
+        pipeline (defs/legacy_orchestration) into the legacy Azure staging
+        tables this asset reads from -- the one point in the graph where
+        the legacy-scheduled and Dagster-owned sides visibly meet. No
+        ingestion tool beyond that legacy pipeline is named for this
+        business unit in the AE notes.
+      metadata:
+        owner: "Recycling"
+        owner_team: "team:umicore-recycling"
+        tier: "tier_2"
+        domain: "recycling"
+        deployment_mode: "demo"
+        data_residency: "eu"
+        integration_pattern: "coexistence"
+        legacy_system_boundary: >-
+          Downstream of the Stonebranch/ADF-triggered legacy copy --
+          Dagster owns freshness, quality, and lineage from here on,
+          Stonebranch stays master for the trigger itself.
+
+    - key: "specialty_materials/raw_specialty_materials_output"
+      group_name: specialty_materials
+      kinds: ["azure"]
+      partitions_def: "{{ daily_partitions }}"
+      owners: ["team:umicore-specialty-materials"]
+      description: >-
+        Daily specialty-materials output -- the first job in Anthony's
+        3-job sequential chain example. A blocking arrival check gates
+        stg_specialty_materials and, via eager automation,
+        fct_cross_bu_consolidated_ledger and executive_reporting_extract
+        from computing on a late or incomplete day.
+      metadata:
+        owner: "Specialty Materials"
+        owner_team: "team:umicore-specialty-materials"
+        tier: "tier_1"
+        domain: "specialty_materials"
+        deployment_mode: "demo"
+        data_residency: "eu"
+        business_impact: >-
+          Anthony's own example: "if the first runs long, the other two sit
+          stale until the next scheduled window, with no automatic recovery."
+        severity: "high"

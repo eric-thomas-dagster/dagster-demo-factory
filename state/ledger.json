@@ -1,15 +1,20 @@
 {
-  "brief-ready": [
+  "brief-ready": [],
+  "built": [
     {
       "company": "Umicore",
       "slug": "umicore",
-      "status": "brief-ready",
+      "status": "deployed",
       "demo_date": "TBD",
       "brief_path": "briefs/2026-09-11-umicore.md",
-      "timestamp": "2026-09-11T22:40:00Z"
-    }
-  ],
-  "built": [
+      "timestamp": "2026-09-11T22:40:00Z",
+      "deployed_at": "2026-09-12T07:05:00Z",
+      "location_name": "demo-umicore",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/22",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-umicore",
+      "note": "Coexistence build (pattern 4) for a doc-only, no-meeting-booked brief built from an internal AE business-case document (last live demo Aug 5 2026) -- Stonebranch/Ansible stays master for infra scheduling; Dagster owns freshness/quality/cross-BU lineage across four business units (battery_materials, catalysis/AC, recycling, specialty_materials). 14 assets: battery_materials + catalysis raw layers via a real dagster-databricks DatabricksWorkspaceComponent (demo-mode subclassed as DemoDatabricksWorkspaceComponent, one instance/assets_by_job_task_key mapping covering both jobs), recycling + specialty_materials via a generic WarehouseTableAssetsComponent stub (no ingestion tool named in the brief), a Stonebranch-triggered Azure Data Factory pipeline (community registry azure_data_factory, demo-mode subclassed, reusing the same monkeypatch seam and sensor/key-override gaps first documented for demos/rvu-tempcover) observed via its own polling sensor and consumed downstream by recycling's raw asset (the one point in the graph where the legacy-scheduled and Dagster-owned sides visibly meet), 8 real dbt Core models (4 staging + 4 marts: cross-BU consolidated ledger, executive reporting extract, EU Battery Regulation carbon-footprint inputs + report), and a Power BI semantic-model refresh downstream of the executive extract. Money shot: materializing the specialty-materials raw feed cascades through 2 downstream dbt marts via eager automation (gated on the raw asset's own blocking arrival check), answering the brief's named 3-job-sequential-chain pain directly. Native dagster_databricks.DatabricksWorkspaceComponent has no job-run observation sensor at all (unlike the ADF/Power BI workspace-component convention) -- added one in the subclass, documented in component-feedback/2026-09-12-databricks-workspace-observation-sensor.md with the full registry search record (databricks_table_observation_sensor is table-freshness, not job-run history -- confirmed not a fit). 3 asset checks (2 blocking: specialty-materials arrival, battery carbon-footprint-inputs completeness; 1 warning: AC feed quality) plus 22 dbt-native tests, all real and green; 2 freshness policies (corporate rollup, AC feed); one morning schedule for the raw layer, the only fixed-time trigger in the graph. defs/ is 6 YAML, 7 Python -- all 14 assets are YAML-instantiated, zero hand-written Python asset bodies (the 7 .py files are 3 checks + 1 schedule + 3 template_vars modules, all justified in README). Full validation gate green (dg check defs/yaml, dg list defs/components, validate_e2e.py -- 14 assets, both sensors emit observation events, all 25 checks pass, real I/O confirmed in DuckDB); verified zero-setup from a genuinely fresh clone. One transient PEX-build network timeout on the first deploy attempt (files.pythonhosted.org read timeout), succeeded cleanly on retry -- not a packaging bug, consistent with demos/partners-fcu's identical experience. Deployed and independently confirmed LOADED via dg api."
+    },
     {
       "company": "Partners Federal Credit Union",
       "slug": "partners-fcu",
