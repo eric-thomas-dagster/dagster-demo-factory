@@ -1,0 +1,107 @@
+{
+  "component_type": "dagster_component_templates.ExternalBigQueryTableAsset",
+  "description": "Declare a BigQuery table as an observable external asset.",
+  "category": "external",
+  "icon": "Link",
+  "x-dagster-io": {
+    "outputs": {
+      "type": "AssetSpec",
+      "description": "External asset declaration"
+    }
+  },
+  "attributes": {
+    "asset_key": {
+      "type": "string",
+      "label": "Asset Key",
+      "description": "Dagster asset key",
+      "required": true
+    },
+    "project_id": {
+      "type": "string",
+      "label": "Project Id",
+      "description": "GCP project ID",
+      "required": true
+    },
+    "dataset_id": {
+      "type": "string",
+      "label": "Dataset Id",
+      "description": "BigQuery dataset ID",
+      "required": true
+    },
+    "table_id": {
+      "type": "string",
+      "label": "Table Id",
+      "description": "BigQuery table ID",
+      "required": true
+    },
+    "group_name": {
+      "type": "string",
+      "label": "Group Name",
+      "description": "Dagster asset group name",
+      "required": false,
+      "default": null
+    },
+    "description": {
+      "type": "string",
+      "label": "Description",
+      "description": "Human-readable description",
+      "required": false,
+      "default": null,
+      "ui:widget": "code"
+    },
+    "partition_type": {
+      "type": "string",
+      "label": "Partition Type",
+      "description": "'daily'|'weekly'|'monthly'|'hourly'|'static'|'dynamic'|'multi', or None for unpartitioned.",
+      "required": false,
+      "default": null,
+      "enum": [
+        "daily",
+        "hourly",
+        "weekly",
+        "monthly",
+        "static",
+        "multi",
+        "dynamic"
+      ],
+      "ui:widget": "select"
+    },
+    "partition_start": {
+      "type": "string",
+      "label": "Partition Start",
+      "description": "ISO start date for time-based partition types (e.g. '2024-01-01').",
+      "required": false,
+      "default": null
+    },
+    "partition_values": {
+      "type": "string",
+      "label": "Partition Values",
+      "description": "Comma-separated values for static / multi partition types.",
+      "required": false,
+      "default": null
+    },
+    "dynamic_partition_name": {
+      "type": "string",
+      "label": "Dynamic Partition Name",
+      "description": "Name for DynamicPartitionsDefinition (when partition_type='dynamic').",
+      "required": false,
+      "default": null
+    },
+    "partition_dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "label": "Partition Dimensions",
+      "description": "Multi-axis partition spec: list of {name, type, start, values, dynamic_partition_name} dicts. Overrides flat fields when set.",
+      "required": false,
+      "default": null
+    }
+  },
+  "tags": [
+    "external",
+    "bigquery",
+    "table"
+  ],
+  "name": "External BigQuery Table"
+}

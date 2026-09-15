@@ -1,0 +1,40 @@
+type: neighborhood_intelligence_taxi.components.CronScheduleComponent
+
+attributes:
+  # Full pipeline for the previous month's partition.
+  #
+  # `cron_expression` and `execution_timezone` are OMITTED here on
+  # purpose: in the partitioned-job path the community component calls
+  # `build_schedule_from_partitioned_job`, which rejects those two
+  # kwargs when the job is time-partitioned. The cadence is inferred
+  # from the monthly partitions_def below (equivalent to `0 0 1 * *`
+  # UTC) and each tick auto-targets the most-recent finished partition
+  # -- exactly the brief's "run the previous month" contract.
+  schedule_name: nit_monthly_full_pipeline_schedule
+  default_status: STOPPED
+  job_name: nit_monthly_full_pipeline_job
+
+  partition_type: monthly
+  partition_start: "2022-01-01"
+
+  # Every executable asset in the pipeline -- silver, gold, report --
+  # listed explicitly so the job graph reads honestly rather than relying
+  # on '*' sweeping the code location. Bronze external assets
+  # (`source_yellow_trips`, `source_taxi_zone_lookup`) are AssetSpec-only
+  # observable declarations and not executable, so they cannot be members
+  # of an asset job selection -- the job takes silver as its root and
+  # bronze remains upstream in the lineage graph. Slash-separated syntax
+  # matches the component's `AssetKey.from_user_string` parsing.
+  asset_keys:
+    - silver/stg_yellow_trips
+    - silver/stg_taxi_zones
+    - gold/fct_trips
+    - gold/agg_daily_zone
+    - gold/agg_hourly_demand
+    - gold/agg_vendor_performance
+    - report/report_daily_summary
+    - report/report_top_zones
+
+  tags:
+    team: nit-data-platform
+    schedule_role: monthly_full_pipeline

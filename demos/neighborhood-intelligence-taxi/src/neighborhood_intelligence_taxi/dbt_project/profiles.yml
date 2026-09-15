@@ -1,0 +1,21 @@
+neighborhood_intelligence_taxi:
+  target: "{{ env_var('NIT_DBT_TARGET', 'dev') }}"
+  outputs:
+    dev:
+      type: duckdb
+      # `__init__.py` sets this env var to a working project-relative default
+      # (`demo_data/demo.duckdb`) before Dagster loads any defs, so this
+      # always resolves even with zero manual setup. Override it to point
+      # dbt at a different DuckDB file without touching this profile.
+      path: "{{ env_var('NIT_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    prod:
+      type: bigquery
+      method: service-account
+      # GOOGLE_APPLICATION_CREDENTIALS is the standard GCP env var (no NIT_
+      # prefix on purpose -- callers already point this at their keyfile).
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      project: "{{ env_var('NIT_BIGQUERY_PROJECT', 'bigquery-public-data') }}"
+      dataset: "{{ env_var('NIT_BIGQUERY_DATASET', 'nyc_taxi_demo_marts') }}"
+      threads: 4
+      location: "US"

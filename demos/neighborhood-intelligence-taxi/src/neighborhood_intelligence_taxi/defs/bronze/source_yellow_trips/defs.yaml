@@ -1,0 +1,45 @@
+type: neighborhood_intelligence_taxi.components.ExternalBigQueryTableAsset
+
+attributes:
+  # Bronze external asset -- data physically lives in
+  # bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022; the
+  # Dagster asset here is the observable declaration of it, not a
+  # materialization step. In demo mode dbt reads the mirrored fixture
+  # from local DuckDB (`raw.yellow_trips`, loaded by
+  # demo_data/bootstrap.py); the asset key is identical either way, so
+  # lineage is stable across modes.
+  asset_key: source_yellow_trips
+  project_id: bigquery-public-data
+  dataset_id: new_york_taxi_trips
+  table_id: tlc_yellow_trips_2022
+  group_name: bronze
+  description: >-
+    NYC TLC Yellow Taxi trips (2022) -- public dataset. Every completed
+    yellow-cab ride in New York City for the calendar year: pickup and
+    dropoff timestamps, TLC LocationIDs, fare/tip/tolls economics, vendor,
+    payment type.
+
+  partition_type: monthly
+  partition_start: "2022-01-01"
+
+# Every registered component accepts a top-level `post_processing:` block
+# that overrides AssetSpec attributes per target -- no subclass needed to
+# add owners, trim kinds, or attach house-rules metadata. The vanilla
+# external_bigquery_table sets `kinds={"bigquery","gcp","sql","table"}`;
+# we override to a single bigquery badge to match the brief.
+post_processing:
+  assets:
+    - target: "source_yellow_trips"
+      attributes:
+        owners: ["team:nit-data-platform"]
+        kinds: ["bigquery"]
+        metadata:
+          owner: "NIT Data Platform"
+          owner_team: "team:nit-data-platform"
+          tier: "tier_1"
+          domain: "trips"
+          business_impact: >-
+            Foundational fact source for every downstream
+            neighborhood-intelligence metric -- daily zone rollups, hourly
+            demand curves, vendor economics, and the morning report all
+            sit downstream of this.

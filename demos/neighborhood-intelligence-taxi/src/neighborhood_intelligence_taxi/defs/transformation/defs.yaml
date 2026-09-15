@@ -1,0 +1,39 @@
+type: dagster_dbt.DbtProjectComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../dbt_project
+  # No `select:` -- one instance covers the whole dbt project. group_name
+  # comes from dbt's own `+group:` per folder, read by dagster-dbt from the
+  # manifest -- no Dagster-side translator, no `meta.dagster.group_name`
+  # annotations.
+  translation:
+    partitions_def: "{{ monthly_partitions_def }}"
+    owners: ["team:nit-data-platform"]
+    kinds: ["dbt", "bigquery"]
+    metadata:
+      owner_team: "team:nit-data-platform"
+      tier: "tier_1"
+      domain: "trips"
+
+# Dagster-only concepts (freshness, automation) per group via glob
+# selection. Everything else -- group, materialization, sources, tests --
+# lives in dbt.
+post_processing:
+  # `target:` uses Dagster's asset-selection syntax; `group:<name>`
+  # matches every model in that dbt folder because the group_name was
+  # set from dbt's `+group:` config via the manifest.
+  assets:
+    - target: "group:silver"
+      attributes:
+        automation_condition: "{{ eager }}"
+    - target: "group:gold"
+      attributes:
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ monthly_freshness }}"
+    - target: "group:report"
+      attributes:
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ report_freshness_warning }}"

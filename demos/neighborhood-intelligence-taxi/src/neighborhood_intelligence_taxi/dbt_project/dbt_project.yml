@@ -1,0 +1,38 @@
+name: "neighborhood_intelligence_taxi"
+version: "1.0.0"
+config-version: 2
+
+profile: "neighborhood_intelligence_taxi"
+
+model-paths: ["models"]
+test-paths: ["tests"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  # The fixture window is 2022-01-01 through 2022-03-31. dbt does full-refresh
+  # over the whole window on every partition run -- Dagster's monthly partition
+  # bookkeeping per model is independent of dbt's own execution granularity
+  # (same pattern as demos/rvu-tempcover and demos/kapitus). Widening these
+  # bounds is safe.
+  window_start: "2022-01-01"
+  window_end: "2022-03-31"
+
+# Model groups drive Dagster group_name via dagster-dbt's manifest-native
+# `config.group` translator hook. One instance of DbtProjectComponent
+# covers the whole project; the folder → group mapping below decides which
+# Dagster group each model lands in. Group declarations live in
+# models/_groups.yml (dbt requires them in a schema-file, not here).
+models:
+  neighborhood_intelligence_taxi:
+    silver:
+      +group: silver
+      +materialized: view
+      +schema: silver
+    gold:
+      +group: gold
+      +materialized: table
+      +schema: gold
+    report:
+      +group: report
+      +materialized: table
+      +schema: report
