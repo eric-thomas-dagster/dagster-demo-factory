@@ -1,0 +1,17 @@
+bokadirekt:
+  target: "{{ env_var('BOKADIREKT_DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # `bokadirekt/__init__.py` sets this env var to a working
+      # project-relative default (`demo_data/demo.duckdb`) before Dagster
+      # loads any defs, so this always resolves with zero manual setup.
+      path: "{{ env_var('BOKADIREKT_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    live:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('BOKADIREKT_GCP_PROJECT') }}"
+      dataset: "marts"
+      keyfile: "{{ env_var('BOKADIREKT_GCP_KEYFILE') }}"
+      threads: 4

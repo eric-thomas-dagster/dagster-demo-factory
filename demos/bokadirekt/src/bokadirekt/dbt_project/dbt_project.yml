@@ -1,0 +1,17 @@
+name: "bokadirekt"
+version: "1.0.0"
+config-version: 2
+
+profile: "bokadirekt"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  bokadirekt:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
