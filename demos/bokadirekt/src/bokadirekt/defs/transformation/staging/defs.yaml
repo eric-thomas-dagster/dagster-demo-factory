@@ -1,0 +1,27 @@
+type: bokadirekt.components.BokadirektDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_staging
+  select: "stg_bookings stg_specialists"
+  translation:
+    group_name: dbt
+    owners: ["team:bokadirekt-data"]
+    metadata:
+      owner: "Bokadirekt Data"
+      owner_team: "team:bokadirekt-data"
+      tier: "tier_1"
+      domain: "bookings"
+
+post_processing:
+  assets:
+    - target: "staging/stg_bookings"
+      attributes:
+        automation_condition: "{{ eager_after_bookings_check }}"
+    - target: "staging/stg_specialists"
+      attributes:
+        automation_condition: "{{ eager }}"

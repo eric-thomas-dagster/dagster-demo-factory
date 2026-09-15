@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: raw_bookings
+        meta:
+          dagster:
+            asset_key: ["raw_bookings_feed"]
+      - name: raw_specialists

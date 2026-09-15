@@ -1,0 +1,32 @@
+type: bokadirekt.components.BokadirektDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../../dbt_project
+  op:
+    name: dbt_marts
+  select: "dim_specialists fct_bookings_daily"
+  translation:
+    group_name: dbt
+    owners: ["team:bokadirekt-data"]
+    metadata:
+      owner: "Bokadirekt Data"
+      owner_team: "team:bokadirekt-data"
+      tier: "tier_1"
+      domain: "bookings"
+
+post_processing:
+  assets:
+    - target: "marts/dim_specialists"
+      attributes:
+        automation_condition: "{{ eager }}"
+    - target: "marts/fct_bookings_daily"
+      attributes:
+        automation_condition: "{{ eager }}"
+        partitions_def: "{{ daily_partitions_def }}"
+        freshness_policy: "{{ daily_freshness }}"
+        metadata:
+          business_impact: "The asset a Bokadirekt data person would page someone about -- daily booking volume and revenue."
+          severity: "high"

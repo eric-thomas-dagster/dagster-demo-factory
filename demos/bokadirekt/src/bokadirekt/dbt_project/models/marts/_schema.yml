@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: dim_specialists
+    description: "One row per specialist with lifetime completed-booking volume."
+    columns:
+      - name: specialist_id
+        data_tests: [unique, not_null]
+
+  - name: fct_bookings_daily
+    description: "Daily booking volume and revenue -- the asset a Bokadirekt data person would page someone about."
+    columns:
+      - name: booking_date
+        data_tests: [unique, not_null]
+      - name: booking_count
+        data_tests: [not_null]
