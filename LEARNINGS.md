@@ -90,11 +90,19 @@ component," and never a spec for integrating a specific tool.
   produces, description, validation_level}`.
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
-- **`dg check defs` / `dg list defs` can transiently fail with
-  `ModuleNotFoundError: No module named '<pkg>'`** on the very first
-  invocation right after `uv sync` or `uv pip install -e .` — retry once
-  before treating it as a real error; it consistently succeeds on the
-  second call. (verified 2026-09-12, demos/umicore, reproduced 3×)
+- **`dg check defs` / `dg list defs` failing with `ModuleNotFoundError: No
+  module named '<pkg>'` has two distinct causes.** (1) Transient: the very
+  first invocation right after `uv sync` / `uv pip install -e .` — retry
+  once, it consistently succeeds the second call (verified 2026-09-12,
+  demos/umicore, reproduced 3×). (2) PATH order, non-transient: activating
+  the venv and *then* prepending another bin dir (e.g. `export
+  PATH="$HOME/.local/bin:$PATH"` after `source .venv/bin/activate`, for
+  `uvx`/registry-CLI use) makes `which dg` resolve to the global
+  `~/.local/bin/dg` instead of `<project>/.venv/bin/dg` — that binary has
+  no visibility into the project's editable install and never succeeds no
+  matter how many retries. Fix: activate the venv **last** (`scripts/*.sh`
+  already do this correctly), or don't touch PATH after activation.
+  (verified 2026-09-15, demos/bokadirekt)
 
 ## APIs and schemas
 
@@ -110,6 +118,14 @@ component," and never a spec for integrating a specific tool.
   type to `Nothing` — a real DataFrame return then raises
   `DagsterTypeCheckError` at runtime, not at `dg check defs`. Always chain
   metadata merges off the *latest* spec variable.
+- **`dg.AssetSelection.assets(...)` rejects a `SourceAsset`** (what
+  `@dg.observable_source_asset` returns) with `CheckError: Unexpected type
+  for AssetKey: <class '...SourceAsset'>` when building a job for a
+  sensor/schedule. Use `dg.AssetSelection.keys(dg.AssetKey(...))` instead
+  for source/observable assets. `@dg.observable_source_asset` itself does
+  accept `kinds=` (passed through its `**kwargs`), so badging an
+  externally-owned feed's icon works the same as on a normal asset.
+  (verified 2026-09-15, demos/bokadirekt)
 - **A component's `ResolvedAssetSpec.key` YAML field is a plain string only**
   (slash-joined for multi-segment keys, e.g. `"bu/raw_table"`) — unlike
   `deps:`, which accepts a list of strings. Passing a YAML list for `key:`
@@ -154,15 +170,12 @@ component," and never a spec for integrating a specific tool.
   not a valid objection. Plain resource/IO-manager components (e.g.
   `mssql_io_manager`) do **not** follow this convention — it's specific to
   components that trigger/observe external jobs, not to persistence.
-- **A component's default for its observation/polling-sensor field varies by
-  component — read the field, don't assume the convention default (off) holds
-  everywhere.** Some native workspace-style components (e.g. the current
-  `dagster_databricks.DatabricksWorkspaceComponent`) ship with **no
-  observation/polling-sensor field at all**, unlike their siblings
-  (`AzureDataFactoryComponent`, `PowerBIWorkspaceComponent`) — check the
-  component's actual fields before assuming the convention is complete;
-  adding the sensor in a subclass is rung 3, not rung 4. (verified 2026-09-12,
-  demos/umicore)
+- **A component's default for its observation/polling-sensor field varies —
+  read the field, don't assume the convention default (off) holds
+  everywhere.** Some native workspace-style components ship with **no such
+  field at all**, unlike siblings that do — check before assuming the
+  convention is complete; adding the sensor in a subclass is rung 3, not
+  rung 4. (verified 2026-09-12, demos/umicore)
 - Jobs: use `define_asset_job` with `AssetSelection`. Never call asset functions
   inside a job definition.
 - **Verify each feature-floor item actually appears in `dg list defs --json`.**
