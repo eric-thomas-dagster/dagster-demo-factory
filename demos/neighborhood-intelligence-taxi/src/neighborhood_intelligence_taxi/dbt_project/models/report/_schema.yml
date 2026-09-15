@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: report_daily_summary
+    description: "Citywide daily rollup: one row per pickup_date."
+    columns:
+      - name: pickup_date
+        data_tests: [not_null, unique]
+      - name: trip_count
+        data_tests: [not_null]
+
+  - name: report_top_zones
+    description: "Zones ranked by trip volume across the window."
+    columns:
+      - name: pickup_location_id
+        data_tests: [not_null, unique]
+      - name: trip_count_rank
+        data_tests: [not_null]

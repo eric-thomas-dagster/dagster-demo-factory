@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: fct_trips
+    description: >-
+      Enriched trip fact: one row per completed yellow-taxi trip, joined
+      to pickup and dropoff zone metadata. `trip_id` is the natural key
+      and carries the blocking uniqueness contract.
+    data_tests:
+      # Row-count reconciliation against silver. dagster-dbt surfaces this
+      # as a blocking asset check on fct_trips -- catches the enrichment
+      # left-join silently dropping rows or a broken trip_id key.
+      - equal_rowcount:
+          other_model: ref('stg_yellow_trips')
+          config:
+            severity: error
+    columns:
+      - name: trip_id
+        description: "Natural trip key -- blocking not_null + unique."
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+          - unique:
+              config:
+                severity: error
+      - name: pickup_datetime
+        data_tests: [not_null]
+      - name: pickup_date
+        data_tests: [not_null]
+      - name: pickup_location_id
+        data_tests: [not_null]
+      - name: dropoff_location_id
+        data_tests: [not_null]
+      - name: vendor_id
+        data_tests: [not_null]
+
+  - name: agg_daily_zone
+    description: "Daily trip volume + revenue per pickup zone."
+    columns:
+      - name: pickup_date
+        data_tests: [not_null]
+      - name: pickup_location_id
+        data_tests: [not_null]
+
+  - name: agg_hourly_demand
+    description: "Hour-of-day demand curve per pickup borough."
+    columns:
+      - name: pickup_borough
+        data_tests: [not_null]
+      - name: pickup_hour
+        data_tests: [not_null]
+
+  - name: agg_vendor_performance
+    description: "Per-vendor economics: CMT (1) vs VeriFone (2)."
+    columns:
+      - name: vendor_id
+        data_tests: [not_null, unique]

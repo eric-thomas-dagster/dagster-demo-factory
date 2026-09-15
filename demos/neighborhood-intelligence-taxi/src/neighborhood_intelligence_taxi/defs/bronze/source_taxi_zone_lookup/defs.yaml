@@ -1,0 +1,38 @@
+type: neighborhood_intelligence_taxi.components.ExternalBigQueryTableAsset
+
+attributes:
+  # Bronze external asset -- data lives in
+  # bigquery-public-data.new_york_taxi_trips.taxi_zone_geom. In demo mode
+  # dbt reads the mirrored fixture from local DuckDB
+  # (`raw.taxi_zone_lookup`, loaded by demo_data/bootstrap.py). The zone
+  # lookup itself is a slowly-changing reference table, but the brief
+  # calls for monthly partitions across the pipeline so both bronze
+  # sources partition the same way -- the enrichment join in fct_trips
+  # then reads whichever monthly snapshot upstream produced.
+  asset_key: source_taxi_zone_lookup
+  project_id: bigquery-public-data
+  dataset_id: new_york_taxi_trips
+  table_id: taxi_zone_geom
+  group_name: bronze
+  description: >-
+    TLC Taxi Zone lookup -- one row per LocationID with borough and
+    service-zone attributes. The reference dimension every downstream
+    zone-level aggregate joins against.
+
+  partition_type: monthly
+  partition_start: "2022-01-01"
+
+post_processing:
+  assets:
+    - target: "source_taxi_zone_lookup"
+      attributes:
+        owners: ["team:nit-data-platform"]
+        kinds: ["bigquery"]
+        metadata:
+          owner: "NIT Data Platform"
+          owner_team: "team:nit-data-platform"
+          tier: "tier_1"
+          domain: "reference"
+          business_impact: >-
+            Powers zone enrichment on every trip fact. A stale or missing
+            zone lookup blanks out borough- and service-zone reporting.

@@ -1,0 +1,9 @@
+{
+  "id": "external_bigquery_table",
+  "name": "External BigQuery Table",
+  "category": "external",
+  "ref": "main",
+  "version": "1.0.0",
+  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/external_assets/external_bigquery_table/component.py",
+  "installed_at": "2026-09-14T15:29:51+00:00"
+}

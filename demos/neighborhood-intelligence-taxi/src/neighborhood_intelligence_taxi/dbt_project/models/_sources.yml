@@ -1,0 +1,26 @@
+version: 2
+
+# `meta.dagster.asset_key` on each source maps the dbt source name to the
+# external asset key emitted by `defs/bronze/defs.yaml` (each bronze
+# `NitExternalBigQueryTable` sets its `asset_key` to the same value). That
+# is how the silver models' `{{ source(...) }}` refs become lineage edges
+# from the bronze layer -- no translator subclass needed.
+#
+# In demo mode the dbt profile targets DuckDB and the `raw` schema is
+# populated by `demo_data/bootstrap.py` from the seeded fixture. In real
+# mode the profile targets BigQuery; a matching `raw.yellow_trips` /
+# `raw.taxi_zone_lookup` view sitting on top of the public dataset (or a
+# straight rename of the schema config below) keeps the same SQL working.
+
+sources:
+  - name: raw
+    schema: raw
+    tables:
+      - name: yellow_trips
+        meta:
+          dagster:
+            asset_key: ["source_yellow_trips"]
+      - name: taxi_zone_lookup
+        meta:
+          dagster:
+            asset_key: ["source_taxi_zone_lookup"]

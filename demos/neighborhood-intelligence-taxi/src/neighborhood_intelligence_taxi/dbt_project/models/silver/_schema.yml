@@ -1,0 +1,24 @@
+version: 2
+
+models:
+  - name: stg_yellow_trips
+    description: "Typed yellow-taxi trips, filtered to non-null keys."
+    columns:
+      - name: trip_id
+        data_tests: [not_null, unique]
+      - name: vendor_id
+        data_tests: [not_null]
+      - name: pickup_datetime
+        data_tests: [not_null]
+      - name: pickup_location_id
+        data_tests: [not_null]
+      - name: dropoff_location_id
+        data_tests: [not_null]
+
+  - name: stg_taxi_zones
+    description: "TLC taxi zone LocationID lookup -- borough and service zone per zone_id."
+    columns:
+      - name: zone_id
+        data_tests: [not_null, unique]
+      - name: borough
+        data_tests: [not_null]
