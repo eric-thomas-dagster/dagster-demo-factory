@@ -15,9 +15,13 @@ attributes:
     api_secret: "unused-in-demo-mode"
 
   # Detects Fivetran syncs Dagster didn't trigger (Fivetran's own auto
-  # schedule firing outside of Dagster) and emits observations. Default is
-  # false -- must be turned on explicitly, per LEARNINGS.md.
-  polling_sensor: true
+  # schedule firing outside of Dagster) and emits observations. Off in
+  # demo mode -- the parent FivetranAccountComponent's sensor builder
+  # hits the real Fivetran REST API regardless of the demo_mode seam
+  # on the workspace resource, so ticks 401 without valid creds. The
+  # ADF observation sensor still runs in the demo. Flip this on and
+  # supply real creds to run against RVU's actual Fivetran account.
+  polling_sensor: false
 
   # One entry per Fivetran-synced source table. Adding RVU's next Fivetran
   # connector is one more entry here, never a new component instance.

@@ -7,24 +7,39 @@ dataset. Built with the Dagster Community Components registry and
 
 ## Files in this project
 
+**Start with [PATTERNS.md](./PATTERNS.md).** The other five docs are
+four ways to build the same pipeline (two AI paths, two human paths),
+plus this README for orientation:
+
+|  | Human types instructions | AI reads instructions |
+|---|---|---|
+| **Casual prose** | (talk it through with your team) | [NATURAL_PROMPT.md](./NATURAL_PROMPT.md) — three sentences of prose, PATTERNS.md fills in the rest |
+| **Full specification** | [WALKTHROUGH.md](./WALKTHROUGH.md) (dbt + DCC) or [WALKTHROUGH_PYTHON.md](./WALKTHROUGH_PYTHON.md) (raw Python) | [AI_BUILD_PROMPT.md](./AI_BUILD_PROMPT.md) — the engineer-spec prompt |
+
 | File | What it is | Read it when |
 |---|---|---|
 | [PATTERNS.md](./PATTERNS.md) | Reusable blueprint — how *any* Dagster project at Neighborhood Intelligence should be built. Rules and conventions that stay the same from pipeline to pipeline. | **Start here.** Read once, reference forever. Extend as your team learns. |
-| [AI_BUILD_PROMPT.md](./AI_BUILD_PROMPT.md) | The per-project brief for this pipeline, phrased as a prompt for Claude Code. References PATTERNS.md and adds only what's specific to NYC Yellow Taxi. | You want to build a new pipeline by giving Claude Code a brief and letting it generate the project. Use this as a template — copy, edit the brief, run. |
-| [WALKTHROUGH.md](./WALKTHROUGH.md) | The same build described as steps a human engineer types by hand, with full code snippets. | You want to walk the build yourself, learn the pattern, or narrate it to someone else. |
-| [src/](./src/) | The generated project — the artifact both paths above produce. | You want to run `dg dev`, click through the graph, and see the thing work. |
+| [NATURAL_PROMPT.md](./NATURAL_PROMPT.md) | Casual, user-voice prompts to Claude Code — "hey, build me a pipeline that…" — no jargon, no ticket. Relies on PATTERNS.md to fill in every convention. | You want the "wow" version — three sentences of prose that produces the same project as a 120-line spec. |
+| [AI_BUILD_PROMPT.md](./AI_BUILD_PROMPT.md) | Engineer-quality spec prompt for Claude Code. Precise, structured, reproducible. References PATTERNS.md and adds project-specific bindings. | You want a repeatable AI build — same output every time, easy to diff, easy to review. |
+| [WALKTHROUGH.md](./WALKTHROUGH.md) | Hand-build with dbt + Dagster Community Components. What a Dagster engineer who's adopted dbt writes. | You're a dbt shop and want to see the idiomatic wire-up. |
+| [WALKTHROUGH_PYTHON.md](./WALKTHROUGH_PYTHON.md) | Hand-build with pure `dagster` + `dagster-gcp`, no dbt, no DCC. What a Dagster engineer types into an empty project. | You want the raw Dagster experience — every `@asset`, every `@asset_check`, every SQL string. The line-count contrast with the dbt path is the point. |
+| [src/](./src/) | The generated project — the artifact the AI paths produce and the dbt walkthrough targets. | You want to run `dg dev`, click through the graph, and see the thing work. |
 
 ## Suggested flow
 
 1. **Read [PATTERNS.md](./PATTERNS.md) once.** It's your team's
    blueprint — captures how a Dagster project should be structured at
-   NI, given your stack (BigQuery + dbt + Dagster+ Serverless).
-2. **Pick a path per new pipeline:**
-   - Faster + hands-off → copy [AI_BUILD_PROMPT.md](./AI_BUILD_PROMPT.md),
-     rewrite the brief for your new pipeline, run it through Claude Code.
-   - Slower + more control → follow [WALKTHROUGH.md](./WALKTHROUGH.md)
-     step by step, adapting each step to your new pipeline.
-3. **Extend PATTERNS.md** whenever your team hits something the
+   NI, given your stack.
+2. **See both hand-build paths side by side.** Skim
+   [WALKTHROUGH.md](./WALKTHROUGH.md) and
+   [WALKTHROUGH_PYTHON.md](./WALKTHROUGH_PYTHON.md) — same graph, two
+   very different code volumes. That contrast is the argument for
+   adopting dbt + the DCC registry.
+3. **Try the AI paths.** Copy [NATURAL_PROMPT.md](./NATURAL_PROMPT.md)
+   into Claude Code for the three-sentence version, or use
+   [AI_BUILD_PROMPT.md](./AI_BUILD_PROMPT.md) as a spec template for
+   reproducible builds.
+4. **Extend PATTERNS.md** whenever your team hits something the
    blueprint doesn't cover. That's how it stays current.
 
 ## How Claude always finds PATTERNS.md

@@ -48,6 +48,10 @@ LEGACY_KEYS = [
     dg.AssetKey("adf_pipeline_legacy_nightly_ingestion"),
 ]
 
+LEGACY_DOWNSTREAM_KEYS = [
+    dg.AssetKey("adf_landing_zone_audit"),
+]
+
 UNPARTITIONED_KEYS = [
     dg.AssetKey("raw_quote_requests"),
     dg.AssetKey("raw_bound_policies"),
@@ -70,8 +74,12 @@ DOWNSTREAM_KEYS = [
 ]
 
 ALL_ASSET_COUNT = (
-    len(LEGACY_KEYS) + len(UNPARTITIONED_KEYS) + len(PARTITIONED_KEYS) + len(DOWNSTREAM_KEYS)
-)  # 13
+    len(LEGACY_KEYS)
+    + len(LEGACY_DOWNSTREAM_KEYS)
+    + len(UNPARTITIONED_KEYS)
+    + len(PARTITIONED_KEYS)
+    + len(DOWNSTREAM_KEYS)
+)  # 14
 
 # The daily partition definition starts 2026-08-01, and dbt's own vars
 # (min_date/max_date) span the fixture window through 2026-12-31; today's
@@ -154,7 +162,21 @@ def main() -> int:
     print("\n==> Legacy incumbent observation sensor (detects runs Dagster didn't trigger)")
     sensor_def = definitions.get_sensor_def("legacy_orchestration_observation_sensor")
     with dg.build_sensor_context(instance=instance, definitions=definitions) as sensor_ctx:
-        observations = list(sensor_def(sensor_ctx))
+        raw = sensor_def(sensor_ctx)
+    # Sensor return may be a SensorResult (current shape) OR an
+    # iterable of events (legacy shape). Extract the asset events
+    # accordingly.
+    observations: list = []
+    if isinstance(raw, dg.SensorResult):
+        observations = list(raw.asset_events or [])
+    elif raw is not None:
+        for item in raw:
+            if item is None:
+                continue
+            if isinstance(item, dg.SensorResult):
+                observations.extend(item.asset_events or [])
+            else:
+                observations.append(item)
     check(len(observations) > 0, "sensor emitted at least one AssetObservation")
     check(
         all(o.asset_key == LEGACY_KEYS[0] for o in observations),
@@ -176,6 +198,10 @@ def main() -> int:
         for evaluation in result.get_asset_check_evaluations():
             seen_checks.add(evaluation.check_name)
             check(evaluation.passed, f"{date}: check '{evaluation.check_name}' passed")
+
+    print("\n==> Legacy downstream (plain Python asset via deps= on the ADF pipeline)")
+    result = run(definitions, instance, LEGACY_DOWNSTREAM_KEYS, partition_key=None, label="legacy downstream")
+    check(True, f"materialized {len(LEGACY_DOWNSTREAM_KEYS)} legacy-downstream asset(s)")
 
     print("\n==> Downstream activation + reporting (unpartitioned deps= on partitioned upstream)")
     result = run(definitions, instance, DOWNSTREAM_KEYS, partition_key=None, label="downstream activation/reporting")
