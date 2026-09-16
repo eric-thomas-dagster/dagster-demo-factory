@@ -91,17 +91,11 @@ component," and never a spec for integrating a specific tool.
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
 - **`dg check defs` / `dg list defs` failing with `ModuleNotFoundError: No
-  module named '<pkg>'` has two distinct causes.** (1) Transient: the very
-  first invocation right after `uv sync` / `uv pip install -e .` — retry
-  once, it consistently succeeds the second call (verified 2026-09-12,
-  demos/umicore, reproduced 3×). (2) PATH order, non-transient: activating
-  the venv and *then* prepending another bin dir (e.g. `export
-  PATH="$HOME/.local/bin:$PATH"` after `source .venv/bin/activate`, for
-  `uvx`/registry-CLI use) makes `which dg` resolve to the global
-  `~/.local/bin/dg` instead of `<project>/.venv/bin/dg` — that binary has
-  no visibility into the project's editable install and never succeeds no
-  matter how many retries. Fix: activate the venv **last** (`scripts/*.sh`
-  already do this correctly), or don't touch PATH after activation.
+  module named '<pkg>'` has two causes.** (1) Transient, right after
+  `uv sync` — retry once. (2) Non-transient PATH order: prepending another
+  bin dir (e.g. for `uvx`) *after* `source .venv/bin/activate` makes `dg`
+  resolve to a global binary with no visibility into the project's editable
+  install. Fix: activate the venv **last**, never touch PATH after.
   (verified 2026-09-15, demos/bokadirekt)
 
 ## APIs and schemas
@@ -119,12 +113,9 @@ component," and never a spec for integrating a specific tool.
   `DagsterTypeCheckError` at runtime, not at `dg check defs`. Always chain
   metadata merges off the *latest* spec variable.
 - **`dg.AssetSelection.assets(...)` rejects a `SourceAsset`** (what
-  `@dg.observable_source_asset` returns) with `CheckError: Unexpected type
-  for AssetKey: <class '...SourceAsset'>` when building a job for a
-  sensor/schedule. Use `dg.AssetSelection.keys(dg.AssetKey(...))` instead
-  for source/observable assets. `@dg.observable_source_asset` itself does
-  accept `kinds=` (passed through its `**kwargs`), so badging an
-  externally-owned feed's icon works the same as on a normal asset.
+  `@dg.observable_source_asset` returns) for a sensor/schedule job — use
+  `dg.AssetSelection.keys(dg.AssetKey(...))` instead. The decorator does
+  accept `kinds=` though, so badging still works normally.
   (verified 2026-09-15, demos/bokadirekt)
 - **A component's `ResolvedAssetSpec.key` YAML field is a plain string only**
   (slash-joined for multi-segment keys, e.g. `"bu/raw_table"`) — unlike
@@ -185,6 +176,23 @@ component," and never a spec for integrating a specific tool.
   `partitions_def` or `freshness_policy` at all (any component) — verify those
   two specifically by loading `Definitions` in Python and checking
   `assets_def.partitions_def` / `asset_spec.freshness_policy` instead.
+
+## dbt
+
+- **A `DbtProjectComponent` instance covering a whole project is one multi-asset
+  node.** Materializing a proper subset of its models (e.g. one layer only, via
+  `asset_selection=[...]` with no explicit check keys) can still crash: a
+  cross-model generic test (e.g. `equal_rowcount` with `other_model: ref(...)`
+  declared on a *downstream* model, referencing an *upstream* one) gets eagerly
+  pulled into dbt's indirect test selection because the upstream model is
+  selected, even though the downstream model the test is declared on isn't
+  selected/built yet (`Catalog Error: Table ... does not exist`). Reproduces via
+  `dbt-core` 1.11 / `dagster-dbt` 0.29.21 selecting only the upstream layer.
+  Relevant to any demo whose narrative materializes dbt layers incrementally
+  (build-by-hand style) rather than the whole project at once — verify
+  layer-by-layer materialization explicitly, not just a full-project run, when
+  a generic test's `other_model` crosses layers. (verified 2026-09-16,
+  demos/neighborhood-intelligence-taxi)
 
 ## Partitions
 
