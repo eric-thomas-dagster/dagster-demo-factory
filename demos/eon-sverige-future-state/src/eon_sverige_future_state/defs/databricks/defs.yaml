@@ -1,0 +1,111 @@
+type: eon_sverige_future_state.components.EonDatabricksWorkspaceComponent
+
+attributes:
+  demo_mode: true
+
+  # Never called in demo mode -- placeholder literals keep the required
+  # string fields valid. To point this at E.ON's real Databricks
+  # workspace, set demo_mode: false and replace with:
+  #   host: "{{ env.DATABRICKS_HOST }}"
+  #   token: "{{ env.DATABRICKS_TOKEN }}"
+  workspace:
+    host: "unused-in-demo-mode"
+    token: "unused-in-demo-mode"
+
+  # Native `assets_by_job_task_key` mapping: {job_name: {task_key: [AssetSpec]}}.
+  # Adding E.ON's next Databricks job is one more entry here, never a new
+  # component instance (CLAUDE.md § "One component instance, many objects").
+  assets_by_job_task_key:
+    ingest_meter_reads_to_bronze:
+      main:
+        - key: "bronze/meter_reads_delta"
+          deps: ["source/raw_meter_reads"]
+          group_name: databricks_ingestion
+          kinds: ["databricks", "python"]
+          owners: ["team:eon-data-platform"]
+          description: >-
+            Pulls raw NB-IoT meter reads from the ADLS landing zone and lands
+            them as a Databricks Delta bronze table. Executed by Databricks
+            Jobs today via E.ON's GitLab scheduler; Dagster observes and can
+            re-trigger.
+          metadata:
+            owner_team: "team:eon-data-platform"
+            tier: "tier_1"
+            domain: "metering"
+            integration_pattern: "coexistence"
+            legacy_system_boundary: >-
+              Orchestrated externally by GitLab today; Dagster observes runs
+              and re-triggers when needed.
+            business_impact: >-
+              First-hop landing for the meter rollout's ~1M-meter feed. Any
+              outage here is a downstream billing + grid-forecast + compliance
+              outage.
+
+    ingest_grid_telemetry_to_bronze:
+      main:
+        - key: "bronze/grid_load_telemetry_delta"
+          deps: ["source/raw_grid_load_telemetry"]
+          group_name: databricks_ingestion
+          kinds: ["databricks", "python"]
+          owners: ["team:eon-data-platform"]
+          description: >-
+            Lands hourly grid-load telemetry per network segment as a
+            Databricks Delta bronze table.
+          metadata:
+            owner_team: "team:eon-data-platform"
+            tier: "tier_1"
+            domain: "grid_operations"
+            integration_pattern: "coexistence"
+            legacy_system_boundary: >-
+              Orchestrated externally by GitLab today; Dagster observes runs
+              and re-triggers when needed.
+            business_impact: >-
+              Feeds the grid_load_forecast_model on Azure ML and the daily
+              operations briefing.
+
+    ingest_customer_records_to_bronze:
+      main:
+        - key: "bronze/customer_records_delta"
+          deps: ["source/raw_customer_records"]
+          group_name: databricks_ingestion
+          kinds: ["databricks", "python"]
+          owners: ["team:eon-data-platform"]
+          description: >-
+            Lands customer records from the retail platform as a Databricks
+            Delta bronze table. Feeds the EU 2026/855 customer_switching_extract.
+          metadata:
+            owner_team: "team:eon-data-platform"
+            tier: "tier_1"
+            domain: "customer"
+            integration_pattern: "coexistence"
+            legacy_system_boundary: >-
+              Orchestrated externally by GitLab today; Dagster observes runs
+              and re-triggers when needed.
+            business_impact: >-
+              Auditable source-of-truth for the customer_switching_extract
+              (EU 2026/855 compliance).
+
+    bronze_data_quality_gate:
+      main:
+        - key: "bronze/bronze_dq_gate"
+          deps:
+            - "bronze/meter_reads_delta"
+            - "bronze/grid_load_telemetry_delta"
+            - "bronze/customer_records_delta"
+          group_name: databricks_ingestion
+          kinds: ["databricks", "python"]
+          owners: ["team:eon-data-platform"]
+          description: >-
+            Databricks-native DQ notebook that runs completeness + schema
+            checks on the bronze layer before dbt takes over.
+          metadata:
+            owner_team: "team:eon-data-platform"
+            tier: "tier_1"
+            domain: "data_quality"
+            integration_pattern: "coexistence"
+            legacy_system_boundary: >-
+              Databricks-native DQ notebook; Dagster observes its outcome as a
+              first-class asset.
+            business_impact: >-
+              Gate before the dbt transform layer. Refuses to signal-ready
+              when a source feed is incomplete.

@@ -1,0 +1,23 @@
+type: eon_sverige_future_state.components.DemoMLflowModelPromotionComponent
+
+attributes:
+  demo_mode: true
+  asset_name: grid_load_forecast_model
+  tracking_uri_env_var: MLFLOW_TRACKING_URI
+  model_name: grid_load_forecast
+  source_stage: Staging
+  target_stage: Production
+  archive_existing_target: true
+  group_name: azure_ml
+  kinds: ["azure_ml", "mlflow"]
+  owners: ["team:eon-ml-platform"]
+  tier: tier_1
+  domain: ml_ops
+  owner_team: team:eon-ml-platform
+  business_impact: >-
+    Promotes the trained grid-load forecast model to Production on
+    Azure ML's MLflow-compatible registry. First-class Dagster asset
+    means the promotion has lineage, retries, and an audit trail -- not
+    a manual click.
+  deps:
+    - "gold/fct_grid_hourly"

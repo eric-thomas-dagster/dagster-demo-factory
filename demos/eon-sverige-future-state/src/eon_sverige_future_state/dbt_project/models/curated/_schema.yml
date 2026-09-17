@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: customer_switching_extract
+    description: >-
+      Regulator-facing extract for EU Implementing Regulation 2026/855
+      (customer-switching interoperability). One row per customer with
+      current switching status, retailer, and 30-day energy footprint --
+      every column carries upstream lineage from bronze through
+      Databricks + dbt.
+    columns:
+      - name: customer_id
+        description: "E.ON customer key. Blocking not_null + unique."
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+          - unique:
+              config:
+                severity: error
+      - name: switching_status
+        description: "Enum: none / switch_requested / switch_completed."
+        data_tests: [not_null]
+      - name: retailer_code
+        data_tests: [not_null]
+      - name: compliance_regulation
+        description: "Static provenance stamp: 'EU_2026_855'."
+        data_tests: [not_null]
+      - name: customer_lineage
+        data_tests: [not_null]
+      - name: energy_lineage
+        data_tests: [not_null]

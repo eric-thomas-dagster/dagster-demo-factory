@@ -1,0 +1,21 @@
+type: eon_sverige_future_state.components.DemoMLflowModelInferenceComponent
+
+attributes:
+  demo_mode: true
+  asset_name: meter_anomaly_predictions
+  tracking_uri_env_var: MLFLOW_TRACKING_URI
+  model_name: meter_anomaly_detector
+  model_stage: Production
+  output_column: anomaly_score
+  group_name: azure_ml
+  kinds: ["azure_ml", "mlflow"]
+  owners: ["team:eon-ml-platform"]
+  tier: tier_1
+  domain: ml_ops
+  owner_team: team:eon-ml-platform
+  business_impact: >-
+    Batch inference over the daily meter fact -- flags meter reads
+    whose kWh + signal-quality profile doesn't match a healthy NB-IoT
+    meter. Feeds the ops briefing.
+  deps:
+    - "gold/fct_meter_daily"

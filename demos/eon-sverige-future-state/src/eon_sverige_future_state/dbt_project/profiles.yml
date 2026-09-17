@@ -1,0 +1,20 @@
+eon_sverige_future_state:
+  target: "{{ env_var('EON_DBT_TARGET', 'dev') }}"
+  outputs:
+    dev:
+      type: duckdb
+      # `__init__.py` sets EON_DEMO_DUCKDB_PATH to a working project-
+      # relative default (`demo_data/demo.duckdb`) before Dagster loads
+      # any defs, so this always resolves even with zero manual setup.
+      path: "{{ env_var('EON_DEMO_DUCKDB_PATH') }}"
+      threads: 4
+    prod:
+      type: databricks
+      # Real E.ON deployment: point these at their Unity Catalog
+      # workspace. Env vars are the standard databricks-adapter names.
+      catalog: "{{ env_var('EON_DATABRICKS_CATALOG', 'eon_prod') }}"
+      schema: "{{ env_var('EON_DATABRICKS_SCHEMA', 'gold') }}"
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4

@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: stg_meter_reads
+    description: >-
+      Typed silver view of Landis+Gyr NB-IoT smart meter interval reads.
+      Filtered to non-null meter/customer keys and the fixture window.
+    columns:
+      - name: read_id
+        data_tests: [not_null, unique]
+      - name: meter_id
+        data_tests: [not_null]
+      - name: customer_id
+        data_tests: [not_null]
+      - name: region_code
+        data_tests: [not_null]
+      - name: read_date
+        data_tests: [not_null]
+      - name: kwh
+        data_tests: [not_null]
+
+  - name: stg_grid_telemetry
+    description: >-
+      Typed silver view of hourly grid-load telemetry per network region
+      (Malmö, Norrköping, Umeå).
+    columns:
+      - name: telemetry_id
+        data_tests: [not_null, unique]
+      - name: region_code
+        data_tests: [not_null]
+      - name: telemetry_date
+        data_tests: [not_null]
+      - name: hour_of_day
+        data_tests: [not_null]
+      - name: load_mw
+        data_tests: [not_null]

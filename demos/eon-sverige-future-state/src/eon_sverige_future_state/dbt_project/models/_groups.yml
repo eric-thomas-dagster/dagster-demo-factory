@@ -1,0 +1,15 @@
+version: 2
+
+# Model groups declared for the `+group:` config in dbt_project.yml.
+# dagster-dbt reads each model's `config.group` from the compiled manifest
+# and sets Dagster's `group_name` per asset -- so silver / gold /
+# curated folders render as distinct groups in the Dagster UI.
+groups:
+  - name: dbt_transformation
+    owner:
+      name: "E.ON Data Platform"
+      email: "data-platform@eon.se"
+  - name: curated_data_products
+    owner:
+      name: "E.ON Data Platform"
+      email: "data-platform@eon.se"

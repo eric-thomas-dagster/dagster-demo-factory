@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: fct_meter_daily
+    description: >-
+      Daily meter fact -- one row per (meter_id, read_date). Feeds the
+      MLflow meter-anomaly detector downstream.
+    data_tests:
+      # Row-count reconciliation against the silver stg_meter_reads.
+      # dagster-dbt surfaces this as a blocking asset check on
+      # fct_meter_daily. Catches a broken join or an aggregation that
+      # silently drops rows in the silver -> gold transition.
+      - equal_rowcount:
+          other_model: ref('stg_meter_reads')
+          config:
+            severity: error
+    columns:
+      - name: meter_id
+        description: "Landis+Gyr Gridstream Connect meter serial. Blocking not_null."
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+      - name: customer_id
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+      - name: read_date
+        data_tests: [not_null]
+      - name: region_code
+        data_tests: [not_null]
+
+  - name: fct_grid_hourly
+    description: "Hourly aggregate of grid load per region."
+    columns:
+      - name: region_code
+        data_tests: [not_null]
+      - name: telemetry_date
+        data_tests: [not_null]
+      - name: hour_of_day
+        data_tests: [not_null]
+
+  - name: dim_customer_current
+    description: >-
+      Current-state customer dimension. Every row has upstream lineage
+      from bronze.customer_records via the Databricks
+      ingest_customer_records_to_bronze job.
+    columns:
+      - name: customer_id
+        description: "Blocking not_null + unique on the E.ON customer key."
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+          - unique:
+              config:
+                severity: error
+      - name: meter_id
+        data_tests: [not_null]
+      - name: region_code
+        data_tests: [not_null]

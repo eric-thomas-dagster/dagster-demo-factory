@@ -1,0 +1,42 @@
+type: eon_sverige_future_state.components.EonDbtComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../dbt_project
+  # No `select:` -- one instance covers the whole dbt project. group_name
+  # comes from dbt's own `+group:` per folder, read by dagster-dbt from
+  # the manifest -- no Dagster-side translator, no
+  # `meta.dagster.group_name` annotations.
+  translation:
+    partitions_def: "{{ monthly_partitions_def }}"
+    owners: ["team:eon-data-platform"]
+    kinds: ["dbt", "databricks"]
+    metadata:
+      owner_team: "team:eon-data-platform"
+      tier: "tier_1"
+      domain: "metering"
+
+# Dagster-only concepts (freshness, automation) per group via glob
+# selection. Everything else -- group, materialization, sources, tests
+# -- lives in dbt.
+post_processing:
+  assets:
+    - target: "group:dbt_transformation"
+      attributes:
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ monthly_freshness }}"
+    - target: "group:curated_data_products"
+      attributes:
+        automation_condition: "{{ eager }}"
+        freshness_policy: "{{ curated_freshness_warning }}"
+        metadata:
+          owner_team: "team:eon-data-platform"
+          tier: "tier_1"
+          domain: "compliance"
+          business_impact: >-
+            Regulator-facing extract for EU 2026/855 customer-switching
+            interoperability. Every column has upstream lineage from raw
+            source through Databricks to dbt -- this asset IS the audit
+            trail.

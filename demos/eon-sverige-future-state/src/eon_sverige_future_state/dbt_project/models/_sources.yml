@@ -1,0 +1,29 @@
+version: 2
+
+# The bronze Delta tables ingested by Databricks jobs. `meta.dagster.asset_key`
+# on each source maps the dbt source name to the external asset key emitted
+# by `defs/databricks/defs.yaml` (the Databricks workspace component sets
+# each job's `asset_key` to the same value). That is how the silver models'
+# `{{ source(...) }}` refs become lineage edges from the Databricks layer.
+#
+# In demo mode the dbt profile targets DuckDB and the `bronze` schema is
+# populated by `demo_data/bootstrap.py`. In real mode the profile targets
+# Databricks; a matching `bronze.meter_reads` / `bronze.grid_load_telemetry` /
+# `bronze.customer_records` Delta table keeps the same SQL working.
+
+sources:
+  - name: bronze
+    schema: bronze
+    tables:
+      - name: meter_reads
+        meta:
+          dagster:
+            asset_key: ["bronze", "meter_reads_delta"]
+      - name: grid_load_telemetry
+        meta:
+          dagster:
+            asset_key: ["bronze", "grid_load_telemetry_delta"]
+      - name: customer_records
+        meta:
+          dagster:
+            asset_key: ["bronze", "customer_records_delta"]

@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.tmp_dagster_home_*/
+src/eon_sverige_future_state/demo_data/demo.duckdb
+src/eon_sverige_future_state/dbt_project/target/
+src/eon_sverige_future_state/dbt_project/logs/
+src/eon_sverige_future_state/dbt_project/dbt_packages/
+src/eon_sverige_future_state/defs/.local_defs_state/
+.DS_Store
