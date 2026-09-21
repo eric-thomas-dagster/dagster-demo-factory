@@ -7,6 +7,14 @@
       "demo_date": "2026-09-16",
       "brief_path": "briefs/2026-09-16-neighborhood-intelligence.md",
       "timestamp": "2026-09-15T19:00:00Z"
+    },
+    {
+      "company": "MarketGrader.com",
+      "slug": "marketgrader",
+      "status": "brief-ready",
+      "demo_date": "2026-09-25",
+      "brief_path": "briefs/2026-09-25-marketgrader.md",
+      "timestamp": "2026-09-21T20:15:00Z"
     }
   ],
   "built": [
