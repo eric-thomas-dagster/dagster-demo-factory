@@ -49,6 +49,25 @@ component," and never a spec for integrating a specific tool.
 - `deploy_demo.sh` must activate the project venv first, or deploy dies with
   `dagster-cloud: command not found` after validation passed.
 
+## Deployment — PEX fast-deploy currently blocked (verified 2026-09-24)
+
+- **`dagster-cloud serverless deploy-python-executable --build-method local`
+  no longer deploys without Docker for this org.** It now prints "Fast
+  deploys (PEX) are not supported on Serverless (Kubernetes) - baking your
+  build into a Docker image instead" and shells out to `docker build`
+  regardless of `--build-method local` — a platform-side change (org's
+  serverless agent moved to Kubernetes) since the last successful deploy
+  (demo-bokadirekt, 2026-09-15). This sandbox has no Docker daemon (`docker`
+  CLI present, `dockerd` hangs with no log output, no systemd) — CLAUDE.md's
+  "never `serverless deploy`, it needs Docker" now also applies to
+  `deploy-python-executable`. **Before spending a build window on deploy,
+  smoke-test with a throwaway location name** — this is an environment
+  blocker, not fixable by anything in a demo project. If still blocked:
+  finish and publish the PR anyway (validated, not deployed), note it
+  plainly, and don't burn the rest of the run retrying. Re-check whether
+  `ENABLE_FAST_DEPLOYS=false` (mentioned in the CLI's own fallback message)
+  changes this before assuming it's unfixable from here.
+
 ## Deployment — timing and confirmation
 
 - Agent sync after PEX upload routinely takes several minutes. Normal, not a

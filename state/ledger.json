@@ -9,15 +9,6 @@
       "timestamp": "2026-09-15T19:00:00Z"
     },
     {
-      "company": "MarketGrader.com",
-      "slug": "marketgrader",
-      "status": "brief-ready",
-      "demo_date": "2026-09-25",
-      "brief_path": "briefs/2026-09-25-marketgrader.md",
-      "timestamp": "2026-09-24T17:50:00Z",
-      "note": "REBUILD: AE discovery-call notes (Gong-sourced doc, shared 2026-09-24) replaced the prior no-AE-notes/all-unknown brief. Confirmed stack (SQL Server/SSIS via SQL Agent -> target Iceberg/Polaris lake), pain (silent failures, tribal knowledge, late feed detection), personas, and POC scope (migrate one index end-to-end). Demo shape changed from build-a-pipeline to migration-both-states/coexistence. Overrode the AE's own suggested live-failure demo step per house rules -- flagged in the notification, not silently dropped."
-    },
-    {
       "company": "Deichmann SE",
       "slug": "deichmann",
       "status": "brief-ready",
@@ -27,6 +18,16 @@
     }
   ],
   "built": [
+    {
+      "company": "MarketGrader.com",
+      "slug": "marketgrader",
+      "status": "validated",
+      "demo_date": "2026-09-25",
+      "brief_path": "briefs/2026-09-25-marketgrader.md",
+      "timestamp": "2026-09-24T18:00:00Z",
+      "pr_url": "PENDING",
+      "note": "Coexistence build (\"One Index, End to End\") from the AE-discovery-notes rebrief -- migrate the Barron's 400 index end-to-end onto a target Iceberg/Polaris lake while the rest of the SQL Agent/SSIS estate keeps running, one lineage graph across both. 7 assets matching the brief's own explicit enumeration (its '~8 assets' prose note doesn't match its 7-item list; built the named list, same resolution used for earlier builds' identical mismatches): legacy_estate (2 assets, the real community-registry ssis_workspace component, action: noop, demo-mode subclassed as DemoSsisWorkspaceComponent, observed via its polling sensor), lakehouse_ingestion (2 daily-partitioned assets, the real community-registry iceberg_io_manager component, demo-mode subclassed as DemoIcebergIOManagerComponent writing genuine Iceberg tables to a local zero-credential PyIceberg SQL catalog -- verified end-to-end in a scratch project before use), index_calculation/customer_egress/reporting (3 graph-first assets, Axis 2 stubbed). 3 brief-named checks (2 blocking feed-arrival, 1 warning day-over-day bounds) plus 2 bonus native SSIS freshness-lag checks, all real and green against deterministic seeded data (60-symbol synthetic universe, reproduced identically across a genuinely fresh clone). 1 freshness policy on barrons_400_constituents (4h fail/2h warn, this build's own assumption), eager automation gated on the two blocking feed checks, one 5am ET ingestion schedule (also this build's own assumption). Overrode the AE notes' own suggested live-planted-failure demo step per house rules -- flagged in README/notification, not silently dropped. defs/ is 6 YAML, 8 Python -- all 7 assets are YAML-instantiated. Three real registry gaps found and worked around (SSIS: no partitions_def, observation sensor ignoring get_asset_spec's key override, freshness check unrunnable via a job on a noop asset; Iceberg: no namespace bootstrap) -- recorded in component-feedback/2026-09-24-ssis-workspace-gaps.md and component-feedback/2026-09-24-iceberg-io-manager-namespace-bootstrap.md. Full validation gate green (dg check defs/yaml, dg list defs/components, validate_e2e.py, preflight_deploy.sh); verified zero-setup from a genuinely fresh git clone. DEPLOY BLOCKED, not a code-quality failure: dagster-cloud serverless deploy-python-executable --build-method local now refuses PEX fast-deploys for this org ('Fast deploys (PEX) are not supported on Serverless (Kubernetes) - baking your build into a Docker image instead') and falls back to a Docker build this sandbox has no daemon for (confirmed: docker CLI present, dockerd hangs with no output, no systemd) -- a platform-side change since the last successful deploy (demo-bokadirekt, 2026-09-15), not something this build caused. No partial location was left in Dagster+ (confirmed via dg api code-location list). The branch and PR are the complete deliverable; give the live demo locally via dg dev per the README's own guidance, and redeploy manually once Docker is available or the org's serverless agent reverts."
+    },
     {
       "company": "Bokadirekt",
       "slug": "bokadirekt",
