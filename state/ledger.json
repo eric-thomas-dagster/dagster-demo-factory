@@ -9,15 +9,6 @@
       "timestamp": "2026-09-15T19:00:00Z"
     },
     {
-      "company": "MarketGrader.com",
-      "slug": "marketgrader",
-      "status": "brief-ready",
-      "demo_date": "2026-09-25",
-      "brief_path": "briefs/2026-09-25-marketgrader.md",
-      "timestamp": "2026-09-24T17:50:00Z",
-      "note": "REBUILD: AE discovery-call notes (Gong-sourced doc, shared 2026-09-24) replaced the prior no-AE-notes/all-unknown brief. Confirmed stack (SQL Server/SSIS via SQL Agent -> target Iceberg/Polaris lake), pain (silent failures, tribal knowledge, late feed detection), personas, and POC scope (migrate one index end-to-end). Demo shape changed from build-a-pipeline to migration-both-states/coexistence. Overrode the AE's own suggested live-failure demo step per house rules -- flagged in the notification, not silently dropped."
-    },
-    {
       "company": "Deichmann SE",
       "slug": "deichmann",
       "status": "brief-ready",
@@ -27,6 +18,20 @@
     }
   ],
   "built": [
+    {
+      "company": "MarketGrader.com",
+      "slug": "marketgrader",
+      "status": "deployed",
+      "demo_date": "2026-09-25",
+      "brief_path": "briefs/2026-09-25-marketgrader.md",
+      "timestamp": "2026-09-24T18:00:00Z",
+      "deployed_at": "2026-09-24T19:05:00Z",
+      "location_name": "demo-marketgrader",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/26",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-marketgrader",
+      "note": "Coexistence build (\"One Index, End to End\") from the AE-discovery-notes rebrief -- migrate the Barron's 400 index end-to-end onto a target Iceberg/Polaris lake while the rest of the SQL Agent/SSIS estate keeps running, one lineage graph across both. 7 assets matching the brief's own explicit enumeration (its '~8 assets' prose note doesn't match its 7-item list; built the named list, same resolution used for earlier builds' identical mismatches): legacy_estate (2 assets, the real community-registry ssis_workspace component, action: noop, demo-mode subclassed as DemoSsisWorkspaceComponent, observed via its polling sensor), lakehouse_ingestion (2 daily-partitioned assets, the real community-registry iceberg_io_manager component, demo-mode subclassed as DemoIcebergIOManagerComponent writing genuine Iceberg tables to a local zero-credential PyIceberg SQL catalog -- verified end-to-end in a scratch project before use), index_calculation/customer_egress/reporting (3 graph-first assets, Axis 2 stubbed). 3 brief-named checks (2 blocking feed-arrival, 1 warning day-over-day bounds) plus 2 bonus native SSIS freshness-lag checks, all real and green against deterministic seeded data (60-symbol synthetic universe, reproduced identically across a genuinely fresh clone). 1 freshness policy on barrons_400_constituents (4h fail/2h warn, this build's own assumption), eager automation gated on the two blocking feed checks, one 5am ET ingestion schedule (also this build's own assumption). Overrode the AE notes' own suggested live-planted-failure demo step per house rules -- flagged in README/notification, not silently dropped. defs/ is 6 YAML, 8 Python -- all 7 assets are YAML-instantiated. Three real registry gaps found and worked around (SSIS: no partitions_def, observation sensor ignoring get_asset_spec's key override, freshness check unrunnable via a job on a noop asset; Iceberg: no namespace bootstrap) -- recorded in component-feedback/2026-09-24-ssis-workspace-gaps.md and component-feedback/2026-09-24-iceberg-io-manager-namespace-bootstrap.md. Full validation gate green (dg check defs/yaml, dg list defs/components, validate_e2e.py, preflight_deploy.sh); verified zero-setup from a genuinely fresh git clone. First deploy attempt hit the org's new default (deploy-python-executable auto-redirects to a Docker image build when the target registry is Harbor/Kubernetes-backed, which this sandbox can't build), but the CLI ships a documented escape hatch for exactly this -- DAGSTER_CLOUD_DISABLE_PEX_DOCKER_REDIRECT=1 -- confirmed by reading dagster_cloud_cli's own source (commands/serverless/__init__.py, commands/ci/__init__.py). Set it and the plain PEX deploy succeeded and loaded cleanly; the tool's own 'will not be runnable' caveat for that path did not apply here. Deployed and independently confirmed LOADED via dg api code-location list."
+    },
     {
       "company": "Bokadirekt",
       "slug": "bokadirekt",

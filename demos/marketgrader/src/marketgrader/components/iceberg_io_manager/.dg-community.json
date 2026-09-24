@@ -1,0 +1,9 @@
+{
+  "id": "iceberg_io_manager",
+  "name": "IcebergIOManager",
+  "category": "io_manager",
+  "ref": "main",
+  "version": "1.0.0",
+  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/io_managers/iceberg_io_manager/component.py",
+  "installed_at": "2026-09-24T18:06:15+00:00"
+}

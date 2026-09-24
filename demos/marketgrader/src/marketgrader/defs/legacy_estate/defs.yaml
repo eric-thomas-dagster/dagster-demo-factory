@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/integrations/ssis_workspace/schema.json
+#
+# The still-running SQL Agent/SSIS estate -- every index MarketGrader hasn't
+# migrated to the target Iceberg/Polaris lake yet. SQL Agent stays master
+# for these; Dagster only ever observes (action: noop, polling_sensor: true).
+# See components/demo_ssis_workspace.py for the demo-mode seam and the two
+# component gaps it works around.
+#
+# demo_mode: true (default) discovers + observes a simulated SSISDB -- no
+# MarketGrader SQL Server credentials exist. Set demo_mode: false and fill in
+# `workspace` below (the real SsisWorkspaceComponent's own fields, unchanged)
+# to point this at MarketGrader's real SSIS estate; nothing else changes.
+type: marketgrader.components.DemoSsisWorkspaceComponent
+attributes:
+  demo_mode: true
+
+  workspace: {}
+  # Real mode (demo_mode: false) -- uncomment and fill in:
+  # workspace:
+  #   server:   "{{ env.SSIS_SERVER }}"
+  #   database: SSISDB
+  #   user:     "{{ env.SSIS_USER }}"
+  #   password: "{{ env.SSIS_PASSWORD }}"
+  #   driver:   "ODBC Driver 18 for SQL Server"
+  #   trust_server_certificate: true
+
+  action: noop  # external asset -- Dagster never triggers these, only observes
+
+  polling_sensor: true            # opt-in, off by default on this component -- turned on per house rules ("observe, don't just execute")
+  observation_interval_seconds: 300
+
+  # Nightly SQL Agent batches; 25h gives one missed run of slack before the
+  # check would fail -- this build's own assumption (no legacy SLA is named
+  # in the brief), noted in README.
+  freshness_lag_threshold_seconds: 90000
+
+  group_name: legacy_estate
+  kinds: [mssql, ssis]

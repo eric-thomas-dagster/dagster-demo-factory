@@ -1,0 +1,22 @@
+type: marketgrader.components.GraphFirstAssetsComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  assets:
+    - key: licensee_distribution_extract
+      deps: ["barrons_400_constituents"]
+      group_name: customer_egress
+      owners: ["team:marketgrader-index-solutions"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        The feed that goes to fund sponsors/institutions licensing the
+        Barron's 400 index -- recomputes automatically whenever
+        barrons_400_constituents updates. Graph-first (Axis 2 stubbed).
+      metadata:
+        owner: "MarketGrader Index Solutions"
+        owner_team: "team:marketgrader-index-solutions"
+        tier: "tier_1"
+        domain: "customer_egress"
+        business_impact: "What licensees actually receive -- the artifact this whole migration protects."

@@ -1,0 +1,47 @@
+{
+  "component_type": "dagster_component_templates.IcebergIOManagerComponent",
+  "description": "Wrap the official `dagster-iceberg` PyArrowIcebergIOManager so assets persist as Iceberg tables.",
+  "category": "io_manager",
+  "icon": "si:apacheiceberg",
+  "x-dagster-io": {
+    "outputs": {
+      "type": "IOManager",
+      "description": "Wrap the official `dagster-iceberg` PyArrowIcebergIOManager so assets persist as Iceberg tables."
+    }
+  },
+  "attributes": {
+    "resource_key": {
+      "type": "string",
+      "label": "Resource Key",
+      "default": "io_manager",
+      "required": false
+    },
+    "catalog_name": {
+      "type": "string",
+      "label": "Catalog Name",
+      "required": true
+    },
+    "namespace": {
+      "type": "string",
+      "label": "Namespace",
+      "required": true
+    },
+    "catalog_uri": {
+      "type": "string",
+      "label": "Catalog Uri",
+      "required": false
+    },
+    "warehouse": {
+      "type": "string",
+      "label": "Warehouse",
+      "required": false
+    }
+  },
+  "tags": [
+    "io_manager",
+    "iceberg",
+    "lakehouse",
+    "official"
+  ],
+  "name": "IcebergIOManager"
+}

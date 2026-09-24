@@ -1,0 +1,9 @@
+{
+  "id": "ssis_workspace",
+  "name": "SsisWorkspaceComponent",
+  "category": "integration",
+  "ref": "main",
+  "version": "1.0.0",
+  "registry_url": "https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/integrations/ssis_workspace/component.py",
+  "installed_at": "2026-09-24T18:06:11+00:00"
+}
