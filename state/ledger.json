@@ -14,7 +14,8 @@
       "status": "brief-ready",
       "demo_date": "2026-09-25",
       "brief_path": "briefs/2026-09-25-marketgrader.md",
-      "timestamp": "2026-09-21T20:15:00Z"
+      "timestamp": "2026-09-24T17:50:00Z",
+      "note": "REBUILD: AE discovery-call notes (Gong-sourced doc, shared 2026-09-24) replaced the prior no-AE-notes/all-unknown brief. Confirmed stack (SQL Server/SSIS via SQL Agent -> target Iceberg/Polaris lake), pain (silent failures, tribal knowledge, late feed detection), personas, and POC scope (migrate one index end-to-end). Demo shape changed from build-a-pipeline to migration-both-states/coexistence. Overrode the AE's own suggested live-failure demo step per house rules -- flagged in the notification, not silently dropped."
     },
     {
       "company": "Deichmann SE",
