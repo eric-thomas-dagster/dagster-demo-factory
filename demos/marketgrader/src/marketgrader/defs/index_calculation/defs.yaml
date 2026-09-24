@@ -1,0 +1,33 @@
+type: marketgrader.components.GraphFirstAssetsComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  assets:
+    - key: barrons_400_constituents
+      deps: ["raw_price_feed", "raw_corporate_actions"]
+      group_name: index_calculation
+      kinds: ["iceberg"]
+      owners: ["team:marketgrader-index-solutions"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ eager_after_feed_checks }}"
+      freshness_policy: "{{ index_freshness }}"
+      description: >-
+        The one index migrated end-to-end for this POC -- MarketGrader's
+        Barron's 400. Downstream of both target-lakehouse raw feeds; recomputes
+        the moment they land (eager automation), gated on their blocking
+        arrival/completeness checks so it never computes on an incomplete
+        day. Graph-first (Axis 2 stubbed) -- no real scoring logic runs here,
+        real dbt/dagster-native capabilities carry the story.
+      metadata:
+        owner: "MarketGrader Index Solutions"
+        owner_team: "team:marketgrader-index-solutions"
+        tier: "tier_1"
+        domain: "index_calculation"
+        deployment_mode: "target Iceberg/Polaris lake (local PyIceberg SQL catalog in demo mode)"
+        integration_pattern: "coexistence"
+        business_impact: >-
+          A wrong or stale index constituent list ships into a real,
+          licensed financial product -- the exact risk Carlos is evaluating
+          the cutover against.
+        severity: "high"

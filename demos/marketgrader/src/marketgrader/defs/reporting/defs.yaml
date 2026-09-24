@@ -1,0 +1,21 @@
+type: marketgrader.components.GraphFirstAssetsComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  assets:
+    - key: daily_coverage_summary
+      deps: ["barrons_400_constituents"]
+      group_name: reporting
+      owners: ["team:marketgrader-index-solutions"]
+      partitions_def: "{{ daily_partitions }}"
+      automation_condition: "{{ dg.AutomationCondition.eager() }}"
+      description: >-
+        Rollup an ops/research persona checks daily -- how much of the
+        scoped POC universe scored cleanly today. Graph-first (Axis 2
+        stubbed).
+      metadata:
+        owner: "MarketGrader Index Solutions"
+        owner_team: "team:marketgrader-index-solutions"
+        tier: "tier_2"
+        domain: "operations_reporting"

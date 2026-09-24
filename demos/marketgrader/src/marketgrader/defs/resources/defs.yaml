@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/io_managers/iceberg_io_manager/schema.json
+#
+# The target Iceberg/Polaris lake's write boundary for `lakehouse_ingestion`
+# assets. demo_mode: true (default) targets a local, zero-setup PyIceberg SQL
+# (SQLite) catalog under demo_data/ -- genuinely Iceberg table format, no
+# MarketGrader lake credentials required. Set demo_mode: false and fill in
+# catalog_uri/warehouse below (the real IcebergIOManagerComponent's own
+# fields, unchanged) to point this at MarketGrader's real Polaris catalog.
+# See components/demo_iceberg_io_manager.py.
+type: marketgrader.components.DemoIcebergIOManagerComponent
+attributes:
+  demo_mode: true
+  resource_key: io_manager
+  catalog_name: marketgrader_lake
+  namespace: raw
+  # Real mode (demo_mode: false) -- uncomment and fill in:
+  # catalog_uri: "{{ env.POLARIS_CATALOG_URI }}"
+  # warehouse: "{{ env.POLARIS_WAREHOUSE }}"

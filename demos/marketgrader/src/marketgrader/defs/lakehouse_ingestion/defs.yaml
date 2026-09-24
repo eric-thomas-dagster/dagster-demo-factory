@@ -1,0 +1,51 @@
+type: marketgrader.components.LakehouseTableAssetsComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  io_manager_key: io_manager
+
+  assets:
+    - key: raw_price_feed
+      group_name: lakehouse_ingestion
+      kinds: ["iceberg"]
+      partitions_def: "{{ daily_partitions }}"
+      owners: ["team:marketgrader-engineering"]
+      description: >-
+        Daily price feed for the one-index POC universe -- the target-lakehouse
+        replacement for the price side of the legacy SQL Agent/SSIS ingest
+        (legacy_estate/legacy_sql_agent_price_ingest). Vendor unnamed in the
+        AE notes; this generates a deterministic synthetic feed standing in
+        for it.
+      metadata:
+        owner: "MarketGrader Engineering"
+        owner_team: "team:marketgrader-engineering"
+        tier: "tier_1"
+        domain: "price_data"
+        deployment_mode: "target Iceberg/Polaris lake (local PyIceberg SQL catalog in demo mode)"
+        business_impact: >-
+          A late or garbled price feed reaching a published, licensed index
+          constituent list is the exact pain named in discovery question #1 --
+          this is where it's caught instead.
+        partition_expr: "date"
+
+    - key: raw_corporate_actions
+      group_name: lakehouse_ingestion
+      kinds: ["iceberg"]
+      partitions_def: "{{ daily_partitions }}"
+      owners: ["team:marketgrader-engineering"]
+      description: >-
+        Daily corporate-action feed (dividends, splits, spinoffs, name
+        changes) for the one-index POC universe -- the target-lakehouse
+        replacement for the corporate-action side of the legacy SQL
+        Agent/SSIS ingest (legacy_estate/legacy_sql_agent_index_calc's
+        upstream feed). Sparse by design -- most days carry zero-to-a-handful
+        of actions across the universe, matching how these feeds actually
+        behave.
+      metadata:
+        owner: "MarketGrader Engineering"
+        owner_team: "team:marketgrader-engineering"
+        tier: "tier_1"
+        domain: "corporate_actions"
+        deployment_mode: "target Iceberg/Polaris lake (local PyIceberg SQL catalog in demo mode)"
+        partition_expr: "date"
