@@ -27,16 +27,21 @@ brief's "Conflicts and gaps."
 ## 2. Point at the legacy estate (1 min)
 
 Click into the `legacy_estate` group —
-`legacy_sql_agent_price_ingest` / `legacy_sql_agent_index_calc`.
+`legacy_sql_agent_price_ingest` / `legacy_sql_agent_index_calc`. Note the
+dependency arrow between them.
 
-> "These two represent every index you haven't migrated yet. Dagster never
-> triggers these — your SQL Agent stays master. Dagster only observes what
-> already happened." Point at the `integration_pattern: coexistence` and
-> `legacy_system_boundary` metadata on the asset.
+> "These two represent every index you haven't migrated yet. Dagster now
+> triggers and polls these SSIS packages directly — same packages,
+> replacing SQL Agent as the scheduler. Your notes said these run serially;
+> that's now a real dependency in the graph, not just a description of
+> today's scheduler." Point at the `integration_pattern:
+> dagster_calls_legacy` metadata on the asset.
 
-Materialize nothing here — click the sensor
-(`ssis_workspace_observation_sensor`) and show it's a real, toggleable
-Dagster sensor, currently stopped (opt-in by convention).
+Materialize the `legacy_estate` group live — both packages execute in one
+run, in order, and go green fast (demo mode). Then click the sensor
+(`ssis_workspace_observation_sensor`, currently stopped by default) and
+explain it still catches anything triggered outside Dagster — "if someone
+kicks off that SSIS package by hand at 2am, Dagster still sees it."
 
 ## 3. Materialize the new pipeline (2 min) — the money shot setup
 
@@ -86,9 +91,11 @@ sitting alongside `raw_price_feed → raw_corporate_actions →
 barrons_400_constituents → licensee_distribution_extract`.
 
 > "This is what a phased cutover looks like. The indexes you haven't
-> migrated yet keep running exactly as they do today, fully visible here,
-> while this one index is now fully on the new platform. Nothing about
-> migrating index two requires you to touch index one."
+> migrated yet keep running the exact same SSIS packages as today — Dagster
+> just took over scheduling them, so you already get lineage, checks, and a
+> single pane of glass on the whole estate before a single line of SSIS
+> changes. This one index is now fully on the new platform. Nothing about
+> migrating index two requires you to touch index one, or SQL Agent."
 
 This is the direct answer to Carlos's stated fear (implementation time and
 downtime) and Jim's discovery question #2 (seeing legacy and new in one

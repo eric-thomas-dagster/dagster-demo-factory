@@ -13,15 +13,21 @@ methods runs completely unmodified in demo mode -- same discovery SQL, same
 sensor SQL, same freshness-check SQL -- against `FakeSsisEngine`
 (`demo_data/legacy_ssis.py`) instead of a live SQL Server connection.
 
-`action: noop` (the parent's own default) is used unchanged: these two
-packages are external assets Dagster only ever observes, never triggers --
-"SQL Agent stays master for these until they're migrated" (brief). Nothing
-about `action: execute` needs a demo-mode seam here because this demo never
-uses it.
+`action: execute` (per Eric's live direction on 2026-09-24: "we can observe
+AND kick off downstream workloads... we can take that over from the SQL
+Agent... we add the demo mode to fake it working") -- Dagster now genuinely
+orchestrates both packages (`EXEC SSISDB.catalog.create_execution` +
+`start_execution` + poll, the real component's own code path, unmodified),
+replacing SQL Agent as the scheduler, while the SSIS packages themselves
+stay exactly as they are. `_build_engine()`'s fake covers this path too, so
+`_execute_package`'s create/start/poll SQL runs unmodified against
+`FakeSsisEngine` the same way discovery and the sensor's SQL do -- see
+`demo_data/legacy_ssis.py`. The polling observation sensor (`polling_sensor:
+true`) stays on regardless, so a package someone still kicks off by hand
+outside Dagster is still caught.
 
-Two real gaps found reading the component, both worked around here and
-both recorded in
-`component-feedback/2026-09-24-ssis-workspace-gaps.md`:
+Four real gaps found reading the component, all worked around here and
+recorded in `component-feedback/2026-09-24-ssis-workspace-gaps.md`:
 
 1. **No `partitions_def` field at all** -- the base translator's
    `get_asset_spec` builds an unpartitioned `AssetSpec` unconditionally, and
@@ -46,12 +52,33 @@ both recorded in
    check-only selection over one of these keys raises
    `DagsterInvalidDefinitionError: Selected keys must be a subset of
    existing executable asset keys`. Not a demo_mode-only concern -- it would
-   bite a real `action: noop` deployment identically. No subclass fix
-   attempted (the check def itself is unaffected; only running it via a job
-   is blocked) -- `validate_e2e.py` instead invokes the
-   `AssetChecksDefinition` directly via `dg.build_asset_check_context`,
-   which works because the check function itself has no dependency on a
-   job.
+   bite a real `action: noop` deployment identically. Doesn't affect this
+   build any more now that `action: execute` makes both assets genuinely
+   executable (confirmed by switching `validate_e2e.py` back to the normal
+   job-execution path once the action changed), but still real for anyone
+   using `action: noop` -- still worth the registry fixing.
+4. **`_build_freshness_checks`'s per-package closure trick breaks under
+   `action: execute`.** The parent writes
+   `def _check(_spec_key=spec.key): ...` to sidestep Python's late-binding
+   closure bug in the `for spec in specs` loop -- but Dagster's asset-check
+   machinery treats *any* non-`context` parameter on an `@asset_check`
+   function as an input to load from the checked asset via the project's
+   default IO manager. That's invisible when nothing ever runs the check
+   (gap #3, `action: noop`), but once `action: execute` makes the assets
+   real and their default `io_manager` is type-specific -- ours only
+   handles `pyarrow.Table`/`RecordBatchReader` -- every check run fails
+   with `CheckError: IcebergIOManager does not have a handler for type
+   'typing.Any'`, even though the check has nothing to do with Iceberg.
+   Worked around by overriding `_build_freshness_checks` below with a
+   factory-function closure (the correct fix for the late-binding bug,
+   with zero extra parameters) instead of the default-argument trick.
+
+`get_asset_spec` also adds a `deps=` edge from `legacy_sql_agent_index_calc`
+to `legacy_sql_agent_price_ingest` -- the AE notes' "MS SQL Server + SSIS
+run serially via SQL Agent" describes a real dependency, not just today's
+scheduler's behavior, and `action: execute` materializes both packages in
+one atomic op in list order (see `PACKAGES` in `demo_data/legacy_ssis.py`),
+so the declared edge matches actual execution order.
 """
 
 from typing import Any, Optional
@@ -113,14 +140,24 @@ class DemoSsisWorkspaceComponent(SsisWorkspaceComponent):
         flat_key, domain = _FLAT_KEY_BY_PACKAGE.get(
             props.package_name, (props.package_name.removesuffix(".dtsx"), "legacy_estate")
         )
+        # legacy_sql_agent_index_calc depends on legacy_sql_agent_price_ingest --
+        # the AE notes' "run serially via SQL Agent" describes a real
+        # dependency (index calc needs that day's price/corp-action ingest
+        # first), not just today's scheduler's behavior. See module docstring.
+        deps = (
+            [dg.AssetKey(["legacy_sql_agent_price_ingest"])]
+            if flat_key == "legacy_sql_agent_index_calc"
+            else []
+        )
         return base.replace_attributes(
             key=dg.AssetKey([flat_key]),
             group_name="legacy_estate",
             kinds={"mssql", "ssis"},
+            deps=deps,
             metadata={
                 **base.metadata,
-                "integration_pattern": "coexistence",
-                "legacy_system_boundary": "sql_agent_owned",
+                "integration_pattern": "dagster_calls_legacy",
+                "legacy_system_boundary": "ssis_packages_retained_dagster_orchestrated",
                 "owner": "MarketGrader Engineering",
                 "owner_team": "team:marketgrader-engineering",
                 "tier": "tier_1",
@@ -195,3 +232,69 @@ class DemoSsisWorkspaceComponent(SsisWorkspaceComponent):
             return dg.SensorResult(asset_events=observations, cursor=str(new_cursor))
 
         return _observation_sensor
+
+    def _build_freshness_checks(self, specs: list[dg.AssetSpec]) -> list[Any]:
+        """Same query + threshold logic as the parent's freshness checks --
+        only the closure shape changes (gap #4, module docstring). Each
+        check is built by a factory function taking `spec` as a real
+        parameter, so it closes over its own `spec`/`pkg_meta` correctly
+        with no Python late-binding bug -- and the check function itself
+        takes only `context`, so Dagster never infers an input to load."""
+        from datetime import datetime, timezone
+
+        _self = self
+        threshold = self.freshness_lag_threshold_seconds
+
+        def _make_check(spec: dg.AssetSpec):
+            pkg_meta = spec.metadata
+
+            @dg.asset_check(
+                asset=spec.key,
+                name="ssis_freshness_lag",
+                description=(
+                    f"Fails when the last successful SSIS execution of "
+                    f"this package is older than {threshold}s."
+                ),
+            )
+            def _check(context: dg.AssetCheckExecutionContext) -> dg.AssetCheckResult:
+                from sqlalchemy import text as sa_text
+
+                engine = _self._build_engine()
+                with engine.connect() as conn:
+                    row = (
+                        conn.execute(
+                            sa_text(
+                                """
+                                SELECT TOP 1 end_time
+                                FROM SSISDB.catalog.executions
+                                WHERE folder_name = :folder
+                                  AND project_name = :project
+                                  AND package_name = :package
+                                  AND status = 7
+                                ORDER BY end_time DESC
+                                """
+                            ),
+                            {
+                                "folder": pkg_meta["ssis/folder"],
+                                "project": pkg_meta["ssis/project"],
+                                "package": pkg_meta["ssis/package"] + ".dtsx",
+                            },
+                        )
+                        .mappings()
+                        .first()
+                    )
+                if not row or row["end_time"] is None:
+                    return dg.AssetCheckResult(passed=False, description="No successful executions found.")
+                end_time = row["end_time"]
+                if end_time.tzinfo is None:
+                    end_time = end_time.replace(tzinfo=timezone.utc)
+                lag = (datetime.now(timezone.utc) - end_time).total_seconds()
+                return dg.AssetCheckResult(
+                    passed=lag <= threshold,
+                    description=f"lag={int(lag)}s (threshold={threshold}s)",
+                    metadata={"ssis/last_success_at": str(end_time), "ssis/lag_seconds": int(lag)},
+                )
+
+            return _check
+
+        return [_make_check(spec) for spec in specs]

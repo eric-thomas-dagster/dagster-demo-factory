@@ -1,9 +1,12 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/eric-thomas-dagster/dagster-component-templates/main/integrations/ssis_workspace/schema.json
 #
-# The still-running SQL Agent/SSIS estate -- every index MarketGrader hasn't
-# migrated to the target Iceberg/Polaris lake yet. SQL Agent stays master
-# for these; Dagster only ever observes (action: noop, polling_sensor: true).
-# See components/demo_ssis_workspace.py for the demo-mode seam and the two
+# The still-running SSIS estate -- every index MarketGrader hasn't migrated
+# to the target Iceberg/Polaris lake yet. Dagster now orchestrates these two
+# packages directly (action: execute), replacing SQL Agent as the scheduler,
+# while the SSIS packages themselves are kept exactly as-is. The polling
+# sensor stays on too (polling_sensor: true), so a package someone still
+# kicks off by hand outside Dagster is still observed. See
+# components/demo_ssis_workspace.py for the demo-mode seam and the three
 # component gaps it works around.
 #
 # demo_mode: true (default) discovers + observes a simulated SSISDB -- no
@@ -24,7 +27,10 @@ attributes:
   #   driver:   "ODBC Driver 18 for SQL Server"
   #   trust_server_certificate: true
 
-  action: noop  # external asset -- Dagster never triggers these, only observes
+  action: execute  # Dagster now triggers + polls these SSIS packages directly, replacing SQL Agent
+  wait_for_completion: true
+  poll_interval_seconds: 30
+  timeout_seconds: 3600
 
   polling_sensor: true            # opt-in, off by default on this component -- turned on per house rules ("observe, don't just execute")
   observation_interval_seconds: 300

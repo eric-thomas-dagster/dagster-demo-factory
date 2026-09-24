@@ -5,24 +5,29 @@ has partitions, but no '--partition' option was provided") -- 5 of this
 project's 7 assets are daily-partitioned, so this script is the harness
 `scripts/validate_demo.sh` requires instead. It proves, in dependency order:
 
-1. The two genuinely-legacy assets (`legacy_sql_agent_price_ingest`,
-   `legacy_sql_agent_index_calc`) are never materialized by a Dagster run --
-   only observed, via `ssis_workspace_observation_sensor` -- and that the
-   sensor's own key construction agrees with `get_asset_spec`'s (the
+1. The two legacy SSIS assets (`legacy_sql_agent_price_ingest`,
+   `legacy_sql_agent_index_calc`) materialize via a real Dagster-triggered
+   run -- `action: execute` genuinely orchestrates them (create_execution +
+   start_execution + poll, the real component's own code path, against the
+   demo-mode fake engine), replacing SQL Agent as the scheduler while the
+   SSIS packages themselves stay untouched (per Eric's live direction,
+   2026-09-24). Their native `ssis_freshness_lag` checks evaluate as part of
+   that run.
+2. `ssis_workspace_observation_sensor` still catches activity Dagster didn't
+   trigger -- e.g. someone kicking a package off by hand outside Dagster --
+   and its own key construction agrees with `get_asset_spec`'s (the
    registry gap `DemoSsisWorkspaceComponent` works around; see its
-   docstring). The freshness-lag check attached by the real
-   `SsisWorkspaceComponent` is evaluated directly too, same shape as
-   demos/stellantis-financial-services' legacy-observer validation.
-2. `raw_price_feed` / `raw_corporate_actions` materialize across two
+   docstring).
+3. `raw_price_feed` / `raw_corporate_actions` materialize across two
    validation dates, writing real (if synthetic) `pyarrow.Table` rows
    through the real, PyIceberg-SQL-catalog-backed-in-demo-mode
    `iceberg_io_manager` registry component -- and their blocking
    arrival/completeness checks evaluate against those real rows, not a
    hardcoded pass.
-3. `barrons_400_constituents` materializes across both dates (graph-first,
+4. `barrons_400_constituents` materializes across both dates (graph-first,
    Axis 2 stubbed body) with its warning-severity day-over-day bounds check
    evaluating real, deterministic numbers.
-4. `licensee_distribution_extract` and `daily_coverage_summary` -- both
+5. `licensee_distribution_extract` and `daily_coverage_summary` -- both
    graph-first -- materialize downstream.
 
 Per the brief and house rules this is an always-green demo: no planted
@@ -45,10 +50,10 @@ from marketgrader.definitions import defs as defs_lazy  # noqa: E402
 from marketgrader.demo_data.lakehouse import demo_iceberg_catalog_properties  # noqa: E402
 from marketgrader.partitions import DAILY_PARTITIONS  # noqa: E402
 
-LEGACY_KEYS = {
+LEGACY_KEYS = [
     dg.AssetKey(["legacy_sql_agent_price_ingest"]),
     dg.AssetKey(["legacy_sql_agent_index_calc"]),
-}
+]
 RAW_KEYS = [dg.AssetKey(["raw_price_feed"]), dg.AssetKey(["raw_corporate_actions"])]
 DOWNSTREAM_KEYS = [
     dg.AssetKey(["barrons_400_constituents"]),
@@ -116,11 +121,24 @@ def main() -> int:
             len(asset_graph.get_all_asset_keys()) == ALL_ASSET_COUNT,
             f"asset graph has exactly {ALL_ASSET_COUNT} assets",
         )
+        index_calc_deps = set(asset_graph.get(LEGACY_KEYS[1]).parent_keys)
+        check(
+            LEGACY_KEYS[0] in index_calc_deps,
+            "legacy_sql_agent_index_calc declares a dependency on legacy_sql_agent_price_ingest",
+        )
 
-        print("\n==> [1/4] Legacy SSIS estate: never materialized by Dagster, only observed")
+        print("\n==> [1/5] Legacy SSIS chain: Dagster orchestrates both packages directly")
+        run(definitions, instance, LEGACY_KEYS, None, "legacy SSIS chain (price ingest -> index calc)", seen_checks)
+        for key in LEGACY_KEYS:
+            materializations = instance.get_event_records(
+                dg.EventRecordsFilter(event_type=dg.DagsterEventType.ASSET_MATERIALIZATION, asset_key=key)
+            )
+            check(len(materializations) > 0, f"{key.to_user_string()}: Dagster-triggered materialization recorded")
+        check(SSIS_CHECK_NAME in seen_checks, f"{SSIS_CHECK_NAME} evaluated as part of the orchestrated run")
+
+        print("\n==> [2/5] Observation sensor still catches activity Dagster didn't trigger")
         sensor = definitions.get_sensor_def("ssis_workspace_observation_sensor")
         cursor = None
-        freshness_results: list[bool] = []
         for _ in range(3):  # more than one full rotation of the 2 mock packages
             context = dg.build_sensor_context(instance=instance, definitions=definitions, cursor=cursor)
             result = sensor.evaluate_tick(context)
@@ -131,47 +149,21 @@ def main() -> int:
                     isinstance(event, dg.AssetObservation) and event.asset_key in LEGACY_KEYS,
                     f"ssis_workspace_observation_sensor observed a legacy asset key: {event.asset_key}",
                 )
-
         for key in LEGACY_KEYS:
-            materializations = instance.get_event_records(
-                dg.EventRecordsFilter(event_type=dg.DagsterEventType.ASSET_MATERIALIZATION, asset_key=key)
-            )
-            check(len(materializations) == 0, f"{key.to_user_string()}: zero Dagster-triggered materializations, ever")
             observations = instance.get_event_records(
                 dg.EventRecordsFilter(event_type=dg.DagsterEventType.ASSET_OBSERVATION, asset_key=key)
             )
             check(len(observations) > 0, f"{key.to_user_string()}: at least one AssetObservation recorded")
 
-        print("\n==> Legacy freshness-lag check (native to SsisWorkspaceComponent, evaluated directly)")
-        # `legacy_sql_agent_*` are pure AssetSpecs with zero Dagster-owned
-        # compute (action: noop) -- Dagster can't build a job over a
-        # check-only selection on a non-executable asset ("Selected keys
-        # must be a subset of existing executable asset keys"), so the
-        # check def is invoked directly instead, same idea as
-        # demos/stellantis-financial-services evaluating its own
-        # non-executable-asset check outside a job.
-        repo = definitions.get_repository_def()
-        for key in LEGACY_KEYS:
-            check_def = repo.asset_checks_defs_by_key[dg.AssetCheckKey(asset_key=key, name=SSIS_CHECK_NAME)]
-            ctx = dg.build_asset_check_context(instance=instance)
-            result = check_def(ctx)
-            freshness_results.append(result.passed)
-            seen_checks.add(SSIS_CHECK_NAME)
-        check(
-            len(freshness_results) == len(LEGACY_KEYS),
-            f"{SSIS_CHECK_NAME} evaluated once per legacy package (got {len(freshness_results)}/{len(LEGACY_KEYS)})",
-        )
-        check(all(freshness_results), f"{SSIS_CHECK_NAME} passed for every legacy package (results: {freshness_results})")
-
-        print(f"\n==> [2/4] Target-lakehouse raw ingestion across {VALIDATION_DATES}")
+        print(f"\n==> [3/5] Target-lakehouse raw ingestion across {VALIDATION_DATES}")
         for date in VALIDATION_DATES:
             run(definitions, instance, RAW_KEYS, date, f"raw ingestion {date}", seen_checks)
 
-        print(f"\n==> [3/4] Downstream chain (barrons_400_constituents -> egress -> reporting) across {VALIDATION_DATES}")
+        print(f"\n==> [4/5] Downstream chain (barrons_400_constituents -> egress -> reporting) across {VALIDATION_DATES}")
         for date in VALIDATION_DATES:
             run(definitions, instance, DOWNSTREAM_KEYS, date, f"downstream chain {date}", seen_checks)
 
-        print("\n==> [4/4] All expected checks ran")
+        print("\n==> [5/5] All expected checks ran")
         for name in CUSTOM_CHECK_NAMES:
             check(name in seen_checks, f"check '{name}' evaluated at least once")
 
