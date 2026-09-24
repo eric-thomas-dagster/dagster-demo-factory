@@ -8,10 +8,22 @@ doc; see `REBUILD NOTICE` at the top of that brief).
 Agent batch chain — silent failures, tribal knowledge, manual checks — with
 asset-based pipelines on a target Iceberg/Polaris lake. The near-term POC
 scope is **one index, end-to-end**: migrate the Barron's 400 index fully,
-prove it, while every other index keeps running on SQL Agent exactly as it
-does today. This is a coexistence (Pattern 4) demo, not a from-scratch
-pipeline build — the money shot is one lineage graph spanning both the
-still-running legacy estate and the new lakehouse pipeline.
+prove it, while every other index keeps running on the same SSIS packages
+as today. The money shot is one lineage graph spanning both the legacy
+estate and the new lakehouse pipeline.
+
+**Revised live, 2026-09-24 (Eric, reviewing the build):** the AE notes'
+"MS SQL Server + SSIS run serially via SQL Agent" describes a real
+dependency, and Eric asked directly whether Dagster could orchestrate the
+legacy SSIS packages rather than only watch them. It can — the real
+`ssis_workspace` component supports genuine triggering
+(`action: execute`), not just observation, so **Dagster now takes over
+scheduling for the legacy SSIS chain too, replacing SQL Agent as the
+trigger, while the SSIS packages themselves are kept exactly as they are.**
+The polling observation sensor stays on regardless, so a package someone
+still kicks off by hand outside Dagster is still caught. This is Pattern 2
+("Dagster calls legacy") layered with the observation half of Pattern 4 —
+see `integration_pattern: "dagster_calls_legacy"` on the legacy assets.
 
 ## Getting started
 
@@ -31,11 +43,15 @@ Demo mode below).
 
 ## The asset graph
 
-- **`legacy_estate`** (2 assets, unpartitioned, external — Dagster observes,
-  never triggers): `legacy_sql_agent_price_ingest`,
-  `legacy_sql_agent_index_calc`. SQL Agent stays master for every index not
-  yet migrated. Built on the real community-registry `ssis_workspace`
-  component (`action: noop`), with its polling sensor turned on.
+- **`legacy_estate`** (2 assets, unpartitioned): `legacy_sql_agent_price_ingest`,
+  `legacy_sql_agent_index_calc` (`deps: [legacy_sql_agent_price_ingest]` —
+  the AE notes' "runs serially" is a real dependency, both packages execute
+  together in that order). Dagster now triggers + polls both SSIS packages
+  directly (`action: execute`) — genuine orchestration through the real
+  community-registry `ssis_workspace` component, replacing SQL Agent as the
+  scheduler for every index not yet migrated, while the SSIS packages
+  themselves are untouched. Its polling sensor is also on, so anything
+  triggered outside Dagster still shows up.
 - **`lakehouse_ingestion`** (2 assets, daily-partitioned): `raw_price_feed`,
   `raw_corporate_actions`. Real `pyarrow.Table` writes through the real
   community-registry `iceberg_io_manager` component, into the local
@@ -69,15 +85,20 @@ the same resolution used for several earlier builds' similar mismatches).
   build's own assumption; no SLA is named in the brief).
 - Eager automation on the calculation → egress → reporting chain, gated on
   the two blocking raw-feed checks for `barrons_400_constituents`.
-- A polling observation sensor over the legacy SQL Agent estate
-  (`ssis_workspace_observation_sensor`) — off by default on the registry
-  component, turned on here per house rules.
+- Dagster orchestrates the legacy SSIS chain directly (`action: execute`)
+  on its own 4:00 AM ET schedule (`marketgrader_legacy_orchestration_schedule`),
+  replacing SQL Agent's own trigger — plus a polling observation sensor
+  (`ssis_workspace_observation_sensor`, off by default on the registry
+  component, turned on here) that still catches anything triggered outside
+  Dagster.
 - One 5:00 AM ET ingestion schedule (`marketgrader_daily_ingestion_schedule`)
-  — this build's own assumption of "well ahead of the 9:30 AM ET market
-  open," not stated in the brief.
-- Narrative metadata: `integration_pattern: "coexistence"`,
-  `legacy_system_boundary: "sql_agent_owned"` on the legacy assets;
-  `business_impact`, `severity` on the assets that matter to the room.
+  for the new lakehouse feeds — this build's own assumption of "well ahead
+  of the 9:30 AM ET market open," not stated in the brief. Independent of
+  the legacy chain's own schedule (different indices, not chained).
+- Narrative metadata: `integration_pattern: "dagster_calls_legacy"`,
+  `legacy_system_boundary: "ssis_packages_retained_dagster_orchestrated"`
+  on the legacy assets; `business_impact`, `severity` on the assets that
+  matter to the room.
 
 **Handled by Dagster+ (demonstrate, don't build):**
 - Alerting on check/freshness failure — point at the alert-policy UI live.
@@ -117,7 +138,7 @@ mid-demo-prep.
 
 | Layer | Demo mode | Real mode (`demo_mode: false`) |
 |---|---|---|
-| Legacy SQL Agent/SSIS estate | `FakeSsisEngine` (`demo_data/legacy_ssis.py`) — no SQL Server credentials required. Same discovery/sensor/check SQL runs unmodified against it. | Point `workspace.server/user/password` (real `SsisWorkspaceComponent` fields, unchanged) at MarketGrader's real SSISDB. |
+| Legacy SQL Agent/SSIS estate | `FakeSsisEngine` (`demo_data/legacy_ssis.py`) — no SQL Server credentials required. Same discovery/sensor/check/execute SQL (`create_execution`/`start_execution`/poll) runs unmodified against it. | Point `workspace.server/user/password` (real `SsisWorkspaceComponent` fields, unchanged) at MarketGrader's real SSISDB. |
 | Target Iceberg lake | Local PyIceberg SQL (SQLite) catalog, zero setup, genuinely Iceberg-format on disk. | Set `catalog_uri`/`warehouse` (real `IcebergIOManagerComponent` fields, unchanged) to MarketGrader's real Polaris/REST catalog. |
 | Price/corporate-action feeds | Deterministic synthetic generators (`demo_data/lakehouse.py`), seeded per-partition-date — same universe, same counts, every run. | No real-mode path exists — vendor unnamed in the brief; wire in a real ingestion source when one is confirmed. |
 
@@ -130,9 +151,9 @@ multi-run recovery story.
 
 ## `defs/` file count
 
-**6 YAML, 8 Python** in `defs/`. All 7 assets are YAML-instantiated
+**6 YAML, 9 Python** in `defs/`. All 7 assets are YAML-instantiated
 (`legacy_estate`, `lakehouse_ingestion`, `index_calculation`,
-`customer_egress`, `reporting`, `resources` — one `defs.yaml` each). The 8
+`customer_egress`, `reporting`, `resources` — one `defs.yaml` each). The 9
 `.py` files, each justified:
 
 - `checks/raw_price_feed_arrival.py`, `checks/raw_corporate_actions_arrival.py`,
@@ -143,6 +164,10 @@ multi-run recovery story.
   needs a specific local hour alongside a `partitions_def`; the registry's
   `cron_schedule` component can't express both together (same gap already
   recorded for demos/detroit-dwsd).
+- `automation/legacy_orchestration_schedule.py` — a plain cron trigger over
+  two unpartitioned assets; no `partitions_def` exists to build a
+  partitioned-job schedule from (the legacy `ssis_workspace` component has
+  no `partitions_def` field at all — see `component-feedback/2026-09-24-ssis-workspace-gaps.md`).
 - `lakehouse_ingestion/template_vars.py`, `index_calculation/template_vars.py`,
   `customer_egress/template_vars.py`, `reporting/template_vars.py` — Jinja
   can't compose `AutomationCondition`s with `&`, so the composed values
@@ -157,7 +182,7 @@ Not counted above (framework/component code, not `defs/`):
 
 | System in the brief | Component | Notes |
 |---|---|---|
-| SQL Server / SQL Agent / SSIS (legacy) | `ssis_workspace` (community registry), subclassed as `DemoSsisWorkspaceComponent` | `action: noop`; polling sensor on. 3 real gaps found and worked around — see `component-feedback/2026-09-24-ssis-workspace-gaps.md`. |
+| SQL Server / SQL Agent / SSIS (legacy) | `ssis_workspace` (community registry), subclassed as `DemoSsisWorkspaceComponent` | `action: execute` (Dagster orchestrates directly, replacing SQL Agent) + polling sensor on. 4 real gaps found and worked around — see `component-feedback/2026-09-24-ssis-workspace-gaps.md`. |
 | Iceberg / Polaris (target lake) | `iceberg_io_manager` (community registry), subclassed as `DemoIcebergIOManagerComponent` | Genuinely Iceberg (PyIceberg SQL catalog), not a badge on DuckDB. 1 gap found (no namespace bootstrap) — see `component-feedback/2026-09-24-iceberg-io-manager-namespace-bootstrap.md`. |
 | Price/corporate-action feed vendor | none — vendor unnamed in the brief | Conversation only; deterministic synthetic generators stand in. |
 
@@ -183,8 +208,11 @@ dg check defs && dg check yaml && dg list defs && dg list components
 python validate_e2e.py
 ```
 
-`validate_e2e.py` proves: the legacy estate is never Dagster-materialized
-(only observed, with the sensor/asset key-identity gap locked in by
-assertion); real rows land in the Iceberg catalog for both raw assets across
-two partition dates; every check evaluates and passes; the downstream chain
-materializes cleanly. See `DEMO_SCRIPT.md` for the live run-of-show.
+`validate_e2e.py` proves: the legacy SSIS chain materializes via a real
+Dagster-triggered run (genuine orchestration against the demo-mode fake,
+not just observation) and its native freshness checks pass; the observation
+sensor still independently catches activity Dagster didn't trigger, with
+the sensor/asset key-identity gap locked in by assertion; real rows land in
+the Iceberg catalog for both raw assets across two partition dates; every
+check evaluates and passes; the downstream chain materializes cleanly. See
+`DEMO_SCRIPT.md` for the live run-of-show.
