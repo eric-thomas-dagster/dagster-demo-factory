@@ -90,19 +90,26 @@ component," and never a spec for integrating a specific tool.
   produces, description, validation_level}`.
 - If `dg list components` misses custom components, re-run
   `dagster-component init --force`.
-- **`dg check defs` / `dg list defs` failing with `ModuleNotFoundError: No
-  module named '<pkg>'` has two distinct causes.** (1) Transient: the very
-  first invocation right after `uv sync` / `uv pip install -e .` — retry
-  once, it consistently succeeds the second call (verified 2026-09-12,
-  demos/umicore, reproduced 3×). (2) PATH order, non-transient: activating
-  the venv and *then* prepending another bin dir (e.g. `export
-  PATH="$HOME/.local/bin:$PATH"` after `source .venv/bin/activate`, for
-  `uvx`/registry-CLI use) makes `which dg` resolve to the global
-  `~/.local/bin/dg` instead of `<project>/.venv/bin/dg` — that binary has
-  no visibility into the project's editable install and never succeeds no
-  matter how many retries. Fix: activate the venv **last** (`scripts/*.sh`
-  already do this correctly), or don't touch PATH after activation.
-  (verified 2026-09-15, demos/bokadirekt)
+- **`ModuleNotFoundError: No module named '<pkg>'` from `dg check defs` has
+  three distinct causes**, in likelihood order: (1) transient first-call
+  right after `uv sync` — retry once (demos/umicore). (2) PATH order:
+  exporting another bin dir *after* `source .venv/bin/activate` shadows the
+  project's own `dg` — activate the venv **last** (demos/bokadirekt). (3)
+  `<pkg>/components/` doesn't exist yet — `dagster-component init` wires the
+  `registry_modules` entry point into `pyproject.toml` unconditionally but
+  never creates the directory; `mkdir -p src/<pkg>/components && touch
+  __init__.py` before the first custom component (demos/marketgrader).
+- **`dagster-component add <id> --auto-install` installs the component's
+  `requirements.txt` into the active venv only, never into `pyproject.toml`
+  `dependencies`** (confirmed by diff, unchanged after `add`) — follow with
+  `uv add <pkg...>` for each or they're silently missing from the wheel/PEX.
+  (demos/marketgrader)
+- **Never use `from __future__ import annotations` in a file defining an
+  `@asset`/`@multi_asset`/`@asset_check`.** It stringifies the `context:`
+  annotation, and Dagster's context-type detection then fails to load even
+  though the type is correct: `DagsterInvalidDefinitionError: Cannot
+  annotate 'context' parameter...`. (demos/marketgrader; also in every
+  generated project's own `CLAUDE.md` gotcha #5)
 
 ## APIs and schemas
 
@@ -131,12 +138,22 @@ component," and never a spec for integrating a specific tool.
   `deps:`, which accepts a list of strings. Passing a YAML list for `key:`
   fails schema validation with "not valid under any of the given schemas"
   and no clearer message. (verified 2026-09-12, demos/umicore)
-
-## Project config
-
-- `profiles.yml` needs a **working default path** with the env var as an
-  optional override: `{{ env_var('X_DUCKDB_PATH', 'demo_data/demo.duckdb') }}`.
-  Requiring it with no fallback ships a demo that won't start.
+- **`pyiceberg.catalog.load_catalog(name, uri="sqlite:///...", warehouse="file://...")`
+  infers `SqlCatalog` from the `sqlite://` scheme with no `"type": "sql"`
+  key needed** — a fully local, zero-credential Iceberg catalog from just
+  those two properties (the registry `iceberg_io_manager` component's own
+  config surface). But `PyArrowIcebergIOManager.handle_output` requires the
+  namespace to already exist (`catalog.create_namespace_if_not_exists(ns)`)
+  before the first write, in both demo and real mode, or it raises
+  `NoSuchNamespaceError` — the component itself never creates it.
+  (dagster-iceberg==0.3.14, pyiceberg==0.11.1; demos/marketgrader)
+- **An asset check on a pure `AssetSpec` with zero compute** (e.g. a
+  workspace component's `action: noop` external asset) **can't run via a
+  job** — `resolve_implicit_job_def_def_for_assets` on a check-only
+  selection raises `Selected keys must be a subset of existing executable
+  asset keys`. Invoke it directly instead:
+  `repo.asset_checks_defs_by_key[AssetCheckKey(...)](dg.build_asset_check_context(instance=instance))`.
+  (demos/marketgrader)
 
 ## Environment
 
