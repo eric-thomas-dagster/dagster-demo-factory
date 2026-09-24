@@ -17,6 +17,16 @@
 # PEX-local can only bundle packages that publish wheels. If a dependency is
 # source-only the build fails -- pin to a wheel-publishing version or drop it
 # and substitute something demo-mode-only.
+#
+# DAGSTER_CLOUD_DISABLE_PEX_DOCKER_REDIRECT=1 (set below): as of 2026-09-24
+# this org's `prod` deployment reports a Harbor/Kubernetes-backed registry,
+# and `deploy-python-executable` auto-redirects to a Docker image build in
+# that case regardless of `--build-method local` (see
+# dagster_cloud_cli.commands.serverless._should_redirect_pex_to_docker) --
+# which fails outright with no Docker daemon available here. This env var
+# skips that redirect and forces the plain PEX path; verified to deploy and
+# load cleanly (demos/marketgrader, 2026-09-24) despite the CLI's own "may
+# not be runnable" warning for that combination.
 
 set -euo pipefail
 
@@ -31,6 +41,7 @@ LOCATION="demo-$SLUG"
 : "${DAGSTER_CLOUD_DEPLOYMENT:?not set}"
 
 export PATH="$HOME/.local/bin:$PATH"
+export DAGSTER_CLOUD_DISABLE_PEX_DOCKER_REDIRECT=1
 
 # `dagster-cloud` and `dg` are project dependencies, so they live in the
 # project's venv, not on the ambient PATH. Without this the deploy dies with
