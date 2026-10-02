@@ -31,6 +31,14 @@
       "demo_date": "2026-10-07",
       "brief_path": "briefs/2026-10-07-mistral-ai.md",
       "timestamp": "2026-09-30T21:00:00Z"
+    },
+    {
+      "company": "SKYGEN USA",
+      "slug": "skygen",
+      "status": "brief-ready",
+      "demo_date": "2026-10-07",
+      "brief_path": "briefs/2026-10-07-skygen.md",
+      "timestamp": "2026-10-02T21:00:00Z"
     }
   ],
   "built": [
