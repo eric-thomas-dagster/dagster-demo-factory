@@ -33,14 +33,6 @@
       "timestamp": "2026-09-30T21:00:00Z"
     },
     {
-      "company": "SKYGEN USA",
-      "slug": "skygen",
-      "status": "brief-ready",
-      "demo_date": "2026-10-07",
-      "brief_path": "briefs/2026-10-07-skygen.md",
-      "timestamp": "2026-10-02T21:00:00Z"
-    },
-    {
       "company": "Harmattan AI",
       "slug": "harmattan-ai",
       "status": "brief-ready",
@@ -50,6 +42,20 @@
     }
   ],
   "built": [
+    {
+      "company": "SKYGEN USA",
+      "slug": "skygen",
+      "status": "deployed",
+      "demo_date": "2026-10-07",
+      "brief_path": "briefs/2026-10-07-skygen.md",
+      "timestamp": "2026-10-02T21:00:00Z",
+      "deployed_at": "2026-10-07T13:55:00Z",
+      "location_name": "demo-skygen",
+      "deployment": "prod",
+      "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/28",
+      "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-skygen",
+      "note": "'One Definition, 170 Tenants': 16 assets -- 3 Fivetran tables + 9 dbt models (date x tenant MultiPartitions, 20 demo tenants), 2 Sigma workbooks, 2 SSIS legacy assets shown beside (not wired into) the Fivetran->dbt->Sigma lineage per Eric's live direction. Real dagster-fivetran/dagster-sigma/ssis_workspace/dagster-dbt components, demo-mode subclassed at the API seam. 2 blocking + 1 warning custom checks + 14 dbt tests, all green; freshness policy on the SLA mart, check-gated eager automation, nightly schedule, Fivetran + SSIS sensors. defs/ is 6 YAML, 4 Python. Fresh-clone verified; deployed and confirmed LOADED."
+    },
     {
       "company": "MarketGrader.com",
       "slug": "marketgrader",
@@ -164,7 +170,7 @@
       "note": "Graph-first, always-green build ('One Ledger, Every Desk') for a 30-minute slot with no AE discovery notes and an unconfirmed audience -- the calendar invite lists zero Trafigura attendees, flagged prominently in README/DEMO_SCRIPT/notification. 10 assets (3 market_data + 2 trade_capture ingestion badged s3, 4 risk_warehouse badged redshift, 1 reporting badged powerbi) -- the brief's own '(~12-14 assets)' sizing note doesn't match its explicit 10-item enumeration; built the named list, flagged the discrepancy. 3 checks (2 blocking), 1 freshness policy on fact_credit_exposure_daily, eager automation on the warehouse layer, one EOD schedule (22:00 UTC, an invented deadline -- no single close time is confirmed across Trafigura's Singapore/Geneva/Houston/Montevideo/Mumbai desks). Reused detroit-dwsd's GraphFirstAssetsComponent verbatim rather than re-deriving the same registry gap (component-feedback/2026-08-28-graph-first-assets.md). Full validation gate green; verified zero-setup from a fresh copy."
     },
     {
-      "company": "City of Detroit — Water & Sewerage Department (DWSD)",
+      "company": "City of Detroit \u2014 Water & Sewerage Department (DWSD)",
       "slug": "detroit-dwsd",
       "status": "deployed",
       "demo_date": "2026-08-28",
