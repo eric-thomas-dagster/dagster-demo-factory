@@ -1,0 +1,33 @@
+# One dbt project, every layer (ingest -> transform -> published -> mart),
+# one component instance. Each Dagster partition runs `dbt build` for one
+# tenant and one day (see SkygenDbtProjectComponent).
+type: skygen.components.SkygenDbtProjectComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  project:
+    project_dir: ../../dbt_project
+  translation:
+    partitions_def: "{{ tenant_daily_partitions }}"
+    owners: ["team:skygen-dwa"]
+    metadata:
+      owner: "Skygen Data Warehouse & Analytics"
+      owner_team: "team:skygen-dwa"
+      tier: "tier_1"
+      domain: "client_benefits_data"
+      deployment_mode: "dbt Core -> Snowflake"
+      data_residency: "client data stays per-tenant in Snowflake"
+
+post_processing:
+  assets:
+    - target: "kind:dbt"
+      attributes:
+        automation_condition: "{{ eager_after_blocking_checks }}"
+    - target: "key:mart/mart_client_sla_scorecard"
+      attributes:
+        freshness_policy: "{{ sla_freshness }}"
+        metadata:
+          business_impact: "The number a client's account team quotes when they ask 'did you meet our SLA?'"
+          severity: "high"
+          sla: "data ready before 06:00 UTC next day"

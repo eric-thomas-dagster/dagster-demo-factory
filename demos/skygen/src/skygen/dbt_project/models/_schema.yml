@@ -1,0 +1,48 @@
+version: 2
+
+models:
+  - name: ing_dental_claims
+    description: Dental claims for one tenant and day, as replicated by Fivetran.
+    columns:
+      - {name: claim_id, tests: [not_null]}
+      - {name: tenant_id, tests: [not_null]}
+  - name: ing_vision_claims
+    description: Vision claims for one tenant and day, as replicated by Fivetran.
+    columns:
+      - {name: claim_id, tests: [not_null]}
+      - {name: tenant_id, tests: [not_null]}
+  - name: ing_member_eligibility
+    description: Member eligibility snapshot for one tenant and day.
+    columns:
+      - {name: member_id, tests: [not_null]}
+      - name: coverage_status
+        tests:
+          - accepted_values: {arguments: {values: [active, termed]}}
+  - name: tfm_claims_unified
+    description: Dental and vision claims conformed to one claim shape.
+    columns:
+      - {name: claim_id, tests: [not_null]}
+      - name: benefit_line
+        tests:
+          - accepted_values: {arguments: {values: [dental, vision]}}
+  - name: tfm_member_coverage
+    description: Member coverage with an active flag, one row per member per day.
+    columns:
+      - {name: member_id, tests: [not_null]}
+  - name: pub_member_claims
+    description: Published claims enriched with member plan and coverage status.
+    columns:
+      - {name: claim_id, tests: [not_null]}
+      - {name: paid_amount, tests: [not_null]}
+  - name: pub_coverage_snapshot
+    description: Published member counts by plan type for the tenant and day.
+    columns:
+      - {name: plan_type, tests: [not_null]}
+  - name: mart_client_sla_scorecard
+    description: One row per tenant per day -- data ready time against the tenant's SLA deadline.
+    columns:
+      - {name: sla_met, tests: [not_null]}
+  - name: mart_client_utilization_summary
+    description: Claims utilization by benefit line for the tenant and day.
+    columns:
+      - {name: benefit_line, tests: [not_null]}

@@ -1,0 +1,19 @@
+skygen:
+  target: "{{ env_var('SKYGEN_DBT_TARGET', 'demo') }}"
+  outputs:
+    demo:
+      type: duckdb
+      # `skygen/__init__.py` defaults this env var to a project-relative path
+      # before anything loads, so it always resolves with zero setup.
+      path: "{{ env_var('SKYGEN_DEMO_DUCKDB_PATH') }}"
+      threads: 1
+    live:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "{{ env_var('SNOWFLAKE_ROLE') }}"
+      database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+      warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
+      schema: "analytics"
+      threads: 4

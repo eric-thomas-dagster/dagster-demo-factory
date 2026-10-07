@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: client_landing
+    description: Tables Fivetran replicates from the per-client SQL Server databases.
+    tables:
+      - name: dental_claims
+      - name: vision_claims
+      - name: member_eligibility
