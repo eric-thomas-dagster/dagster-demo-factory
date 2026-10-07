@@ -54,7 +54,7 @@
       "deployment": "prod",
       "pr_url": "https://github.com/eric-thomas-dagster/dagster-demo-factory/pull/28",
       "dagster_plus_url": "https://ericthomas-dagster.dagster.cloud/prod/locations/demo-skygen",
-      "note": "'One Definition, 170 Tenants': 16 assets -- 3 Fivetran tables + 9 dbt models (date x tenant MultiPartitions, 20 demo tenants), 2 Sigma workbooks, 2 SSIS legacy assets shown beside (not wired into) the Fivetran->dbt->Sigma lineage per Eric's live direction. Real dagster-fivetran/dagster-sigma/ssis_workspace/dagster-dbt components, demo-mode subclassed at the API seam. 2 blocking + 1 warning custom checks + 14 dbt tests, all green; freshness policy on the SLA mart, check-gated eager automation, nightly schedule, Fivetran + SSIS sensors. defs/ is 6 YAML, 4 Python. Fresh-clone verified; deployed and confirmed LOADED."
+      "note": "'One Definition, 170 Tenants': 16 assets -- 3 Fivetran tables + 9 dbt models (date x tenant MultiPartitions, 20 demo tenants), 2 Sigma workbooks, 2 SSIS legacy assets shown beside (not wired into) the Fivetran->dbt->Sigma lineage per Eric's live direction. Real dagster-fivetran/dagster-sigma/ssis_workspace/dagster-dbt components, demo-mode subclassed at the API seam. 2 blocking + 1 warning custom checks + 14 dbt tests, all green; freshness policy on the SLA mart, check-gated eager automation, nightly schedule, Fivetran + SSIS sensors. defs/ is 4 YAML, 6 Python (2 template_vars, 3 checks, 1 schedule). Fresh-clone verified; deployed and confirmed LOADED."
     },
     {
       "company": "MarketGrader.com",
