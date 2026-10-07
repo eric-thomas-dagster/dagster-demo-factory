@@ -1,0 +1,38 @@
+# One Fivetran connector replicating the per-client SQL Server data into
+# Snowflake. Tenant is a partition dimension (see partitions.py), so the
+# 21st tenant -- or the 170th -- is one more entry in TENANTS, not another
+# connector, component instance, or asset.
+#
+# demo_mode: true (default) serves Fivetran API responses from a simulated
+# account and lands synthetic rows in a local DuckDB warehouse. To run
+# against Skygen's real account set demo_mode: false and replace the three
+# credential values (e.g. "{{ env.FIVETRAN_API_KEY }}"); nothing else changes.
+type: skygen.components.DemoFivetranAccountComponent
+
+template_vars_module: .template_vars
+
+attributes:
+  workspace:
+    demo_mode: true
+    account_id: demo_account
+    api_key: demo_key
+    api_secret: demo_secret
+
+  polling_sensor: true   # opt-in, off by default -- catches syncs not started by Dagster
+
+  translation:
+    group_name: fivetran_ingest
+    description: "{{ props.table }} -- replicated by Fivetran from each client's SQL Server database into Snowflake, one slice per tenant and day."
+    partitions_def: "{{ tenant_daily_partitions }}"
+    owners: ["team:skygen-dwa"]
+    metadata:
+      owner: "Skygen Data Warehouse & Analytics"
+      owner_team: "team:skygen-dwa"
+      tier: "tier_1"
+      domain: "client_benefits_data"
+      deployment_mode: "Fivetran SaaS -> Snowflake"
+      integration_pattern: "dagster_calls_fivetran"
+      source_system: "per-client SQL Server databases (demo: 20 of ~170 tenants)"
+      business_impact: "Incomplete landing here is the '98% row count' failure customers notice first."
+      severity: "high"
+      sla: "landed before 06:00 UTC next day"

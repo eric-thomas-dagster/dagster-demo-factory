@@ -1,0 +1,22 @@
+# Sigma workbooks over the dbt marts (the lineage edge is declared in
+# DemoSigmaComponent.get_asset_spec). demo_mode: false calls Sigma's REST API.
+type: skygen.components.DemoSigmaComponent
+
+attributes:
+  demo_mode: true
+  organization:
+    base_url: https://aws-api.sigmacomputing.com
+    client_id: demo_client_id
+    client_secret: demo_client_secret
+  fetch_lineage_data: false
+  translation:
+    group_name: sigma_reporting
+    description: "Sigma workbook '{{ data.properties.name }}', built on the dbt marts."
+    owners: ["team:skygen-bi"]
+    metadata:
+      owner: "Skygen BI"
+      owner_team: "team:skygen-bi"
+      tier: "tier_2"
+      domain: "client_reporting"
+      business_impact: "What client success managers open when a client asks about their SLA."
+      severity: "medium"

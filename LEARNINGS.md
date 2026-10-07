@@ -49,29 +49,13 @@ component," and never a spec for integrating a specific tool.
 - `deploy_demo.sh` must activate the project venv first, or deploy dies with
   `dagster-cloud: command not found` after validation passed.
 
-## Deployment — org now defaults to Docker; use the PEX override (verified 2026-09-24)
+## Deployment — org defaults to Docker; use the PEX override (verified 2026-09-24)
 
-- **`dagster-cloud serverless deploy-python-executable --build-method local`
-  now auto-redirects to a Docker image build for this org**, printing "Fast
-  deploys (PEX) are not supported on Serverless (Kubernetes) - baking your
-  build into a Docker image instead" and shelling out to `docker build`
-  regardless of `--build-method local`. Reading the installed
-  `dagster_cloud_cli` source (`commands/serverless/__init__.py`'s
-  `_should_redirect_pex_to_docker`) shows this is a **live GraphQL check**
-  of whether the deployment's container registry is Harbor (Kubernetes
-  agent, no PEX runtime) — a real backend fact about this org, not a local
-  misconfiguration, and it started failing here only because the build
-  sandbox has no Docker daemon (`docker` CLI present, `dockerd` hangs with
-  no log output, no systemd).
-- **Fix: set `DAGSTER_CLOUD_DISABLE_PEX_DOCKER_REDIRECT=1` before calling
-  `deploy_demo.sh` / `deploy-python-executable`.** This skips that check and
-  deploys a plain PEX bundle — no Docker needed. The CLI's own code warns
-  "if this deployment runs Serverless on Kubernetes the result will not be
-  runnable," but that did **not** hold in practice: the resulting deploy
-  loaded cleanly (confirmed via `dg api code-location list`,
-  demos/marketgrader, 2026-09-24). Try this before concluding a deploy is
-  genuinely Docker-blocked — it very likely isn't. `scripts/deploy_demo.sh`
-  does not set this env var itself yet; export it in the shell first.
+- `deploy-python-executable --build-method local` auto-redirects to a Docker
+  build for this org (live GraphQL check: Harbor/Kubernetes registry), and this
+  sandbox has no Docker daemon. **Export `DAGSTER_CLOUD_DISABLE_PEX_DOCKER_REDIRECT=1`**
+  to force the plain PEX path; it loads fine despite the CLI's "may not be
+  runnable" warning (`scripts/deploy_demo.sh` now sets it itself).
 
 ## Deployment — timing and confirmation
 
@@ -245,3 +229,28 @@ component," and never a spec for integrating a specific tool.
   filter to `{{ partition_key }}` for the Dagster partition to still be
   tracked correctly. Reused across demos/rvu-tempcover, demos/kapitus,
   demos/partners-fcu.
+
+## Components: Fivetran / Sigma / dbt / partitions (verified 2026-10-07, dagster 1.13.25)
+
+- **`dagster-component add <id>` also writes an example `defs/<id>/defs.yaml`** that
+  `dg check defs` then loads (and can fail on a missing resource). Delete it if
+  you only want the class.
+- `FivetranAccountComponent`: swap the API at `FivetranWorkspace.get_client()`
+  (subclass the resource, add a `demo_mode` field); the component's `workspace`
+  field is hard-wired to `FivetranWorkspace`, so re-declare it in the subclass with
+  `dg.Resolver(lambda ctx, m: Sub(**resolve_fields(m, Sub, ctx)))`. Then discovery,
+  `sync_and_poll`, and the polling sensor all run real code against a fake client.
+  Default asset keys are `schema/table`, matching dbt `source()` keys with no mapping.
+- Fivetran's polling sensor skips a sync that a Dagster run already recorded, so
+  test it on a fresh instance.
+- `SigmaComponent` is a `@dataclass`: subclass with `@dataclass` and a defaulted
+  field; fake the API in `write_state_to_path`. Record types import from
+  `dagster_sigma.translator` (not top-level).
+- `DbtProjectComponent`: override `get_cli_args` to pass `--vars` per partition
+  (`json.dumps`); `post_processing` `target: "kind:dbt"` / `"key:a/b"` work. Keys are
+  `[+schema, model]`; DuckDB tables land in `main_<schema>`.
+- `AssetCheckExecutionContext.partition_key` is available (a `MultiPartitionKey`), and
+  `build_schedule_from_partitioned_job` accepts a MultiPartitions def with a daily dim.
+- `AutomationCondition.eager() & all_deps_blocking_checks_passed()` is the check-gated form.
+- DuckDB has one writer process: guard parallel-run access with an `fcntl.flock`
+  lock file around landing writes, dbt calls, and check reads.

@@ -1,0 +1,31 @@
+name: "skygen"
+version: "1.0.0"
+config-version: 2
+profile: "skygen"
+
+model-paths: ["models"]
+clean-targets: ["target", "dbt_packages"]
+
+# One tenant and one day per Dagster partition. Defaults only keep `dbt parse`
+# working; every Dagster run overrides them with `--vars`.
+vars:
+  tenant: tenant_001
+  report_date: "2026-09-28"
+
+models:
+  skygen:
+    +materialized: incremental
+    +incremental_strategy: delete+insert
+    +unique_key: ["tenant_id", "report_date"]
+    ingest:
+      +schema: ingest
+      +meta: {dagster: {group: dbt_ingest}}
+    transform:
+      +schema: transform
+      +meta: {dagster: {group: dbt_transform}}
+    published:
+      +schema: published
+      +meta: {dagster: {group: dbt_published}}
+    mart:
+      +schema: mart
+      +meta: {dagster: {group: dbt_mart}}

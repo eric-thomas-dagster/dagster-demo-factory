@@ -1,0 +1,15 @@
+# The legacy per-client SSIS/PowerShell loads, observed side by side with the
+# new path. SQL Agent stays master (action: noop); Dagster observes via the
+# polling sensor. Deliberately NOT wired into the Fivetran -> dbt -> Sigma
+# lineage: whether SSIS survives into the future state is an open question.
+# demo_mode: false + the real `workspace` fields points this at a live SSISDB.
+type: skygen.components.DemoSsisWorkspaceComponent
+
+attributes:
+  demo_mode: true
+  workspace: {}
+  action: noop
+  polling_sensor: true
+  observation_interval_seconds: 300
+  group_name: legacy_ssis_estate
+  kinds: [ssis, sqlserver]
